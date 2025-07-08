@@ -125,3 +125,9 @@ Changelog:
   - Resolved database schema issues by enforcing PostgreSQL usage
   - Removed SQLite fallback to prevent schema conflicts
   - Application now runs without errors on Replit with full GRPO functionality
+- July 08, 2025. Enhanced Database Support:
+  - Added MS SQL Server support for local development
+  - Created comprehensive database setup scripts
+  - Added environment configuration examples
+  - Improved database connection handling with proper fallbacks
+  - Added pyodbc dependency for SQL Server connectivity

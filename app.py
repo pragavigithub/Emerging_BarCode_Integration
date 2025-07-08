@@ -26,12 +26,24 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Database configuration
 database_url = os.environ.get("DATABASE_URL")
+mssql_server = os.environ.get("MSSQL_SERVER")
+mssql_database = os.environ.get("MSSQL_DATABASE", "WMS_DB")
+mssql_username = os.environ.get("MSSQL_USERNAME")
+mssql_password = os.environ.get("MSSQL_PASSWORD")
+
 if database_url:
     # Production/Replit environment with PostgreSQL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     logging.info("Using PostgreSQL database")
+elif mssql_server and mssql_username and mssql_password:
+    # Local development with MS SQL Server
+    connection_string = f"mssql+pyodbc://{mssql_username}:{mssql_password}@{mssql_server}/{mssql_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
+    app.config["SQLALCHEMY_DATABASE_URI"] = connection_string
+    logging.info(f"Using MS SQL Server database: {mssql_server}/{mssql_database}")
 else:
-    # Local development fallback to SQLite
+    # Fallback to SQLite with proper directory creation
+    import os
+    os.makedirs("instance", exist_ok=True)
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///instance/wms.db"
     logging.info("Using SQLite database for local development")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {

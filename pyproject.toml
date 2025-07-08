@@ -18,4 +18,5 @@ dependencies = [
     "sqlalchemy>=2.0.41",
     "requests>=2.32.4",
     "urllib3>=2.5.0",
+    "pyodbc>=5.2.0",
 ]
