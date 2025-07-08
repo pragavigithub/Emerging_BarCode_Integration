@@ -122,4 +122,6 @@ Changelog:
   - Added PostgreSQL database with proper environment variables
   - Fixed missing template files (grpo_detail.html, inventory_transfer_detail.html)
   - Updated SAP integration to handle offline mode gracefully
-  - Application now runs without errors on Replit
+  - Resolved database schema issues by enforcing PostgreSQL usage
+  - Removed SQLite fallback to prevent schema conflicts
+  - Application now runs without errors on Replit with full GRPO functionality
