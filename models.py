@@ -22,7 +22,7 @@ class User(UserMixin, db.Model):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    grpo_documents = relationship('GRPODocument', back_populates='user')
+    grpo_documents = relationship('GRPODocument', back_populates='user', foreign_keys='GRPODocument.user_id')
     inventory_transfers = relationship('InventoryTransfer', back_populates='user')
     pick_lists = relationship('PickList', back_populates='user', foreign_keys='PickList.user_id')
     inventory_counts = relationship('InventoryCount', back_populates='user')
@@ -33,13 +33,21 @@ class GRPODocument(db.Model):
     id = Column(Integer, primary_key=True)
     po_number = Column(String(20), nullable=False)
     sap_document_number = Column(String(20), nullable=True)
-    status = Column(String(20), default='draft')  # draft, approved, posted, rejected
+    supplier_code = Column(String(50), nullable=True)  # CardCode from SAP
+    supplier_name = Column(String(200), nullable=True)
+    po_date = Column(DateTime, nullable=True)
+    po_total = Column(Float, nullable=True)
+    status = Column(String(20), default='draft')  # draft, submitted, approved, posted, rejected
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    qc_user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # QC approver
+    qc_notes = Column(Text, nullable=True)
+    draft_or_post = Column(String(10), default='draft')  # draft, post
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    user = relationship('User', back_populates='grpo_documents')
+    user = relationship('User', back_populates='grpo_documents', foreign_keys=[user_id])
+    qc_user = relationship('User', foreign_keys=[qc_user_id])
     items = relationship('GRPOItem', back_populates='grpo_document')
 
 class GRPOItem(db.Model):
@@ -47,14 +55,22 @@ class GRPOItem(db.Model):
     
     id = Column(Integer, primary_key=True)
     grpo_document_id = Column(Integer, ForeignKey('grpo_documents.id'), nullable=False)
+    po_line_number = Column(Integer, nullable=True)  # Line number from PO
     item_code = Column(String(50), nullable=False)
     item_name = Column(String(200), nullable=False)
-    quantity = Column(Float, nullable=False)
+    po_quantity = Column(Float, nullable=True)  # Original PO quantity
+    open_quantity = Column(Float, nullable=True)  # Remaining open quantity
+    received_quantity = Column(Float, nullable=False)  # Quantity being received
     unit_of_measure = Column(String(10), nullable=False)
+    unit_price = Column(Float, nullable=True)
     bin_location = Column(String(20), nullable=False)
     batch_number = Column(String(50), nullable=True)
     expiration_date = Column(DateTime, nullable=True)
-    barcode = Column(String(100), nullable=True)
+    supplier_barcode = Column(String(100), nullable=True)  # Original supplier barcode
+    generated_barcode = Column(String(100), nullable=True)  # WMS generated barcode
+    barcode_printed = Column(Boolean, default=False)
+    qc_status = Column(String(20), default='pending')  # pending, approved, rejected
+    qc_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

@@ -88,15 +88,20 @@ def create_grpo():
         flash('Purchase Order not found in SAP B1.', 'error')
         return redirect(url_for('grpo'))
     
-    # Create GRPO document
+    # Create GRPO document with PO details
     grpo_doc = GRPODocument(
         po_number=po_number,
-        user_id=current_user.id
+        supplier_code=po_data.get('CardCode'),
+        supplier_name=po_data.get('CardName'),
+        po_date=datetime.strptime(po_data.get('DocDate', '2025-01-08'), '%Y-%m-%d') if po_data.get('DocDate') else datetime.utcnow(),
+        po_total=po_data.get('DocTotal', 0),
+        user_id=current_user.id,
+        draft_or_post=request.form.get('draft_or_post', 'draft')
     )
     db.session.add(grpo_doc)
     db.session.commit()
     
-    flash('GRPO document created successfully!', 'success')
+    flash(f'GRPO created successfully for PO {po_number}!', 'success')
     return redirect(url_for('grpo_detail', grpo_id=grpo_doc.id))
 
 @app.route('/grpo/<int:grpo_id>')
@@ -120,15 +125,39 @@ def add_grpo_item(grpo_id):
     bin_location = request.form['bin_location']
     batch_number = request.form.get('batch_number')
     
-    # Create GRPO item
+    # Get PO line item details if available
+    sap = SAPIntegration()
+    po_items = sap.get_purchase_order_items(grpo_doc.po_number)
+    
+    # Find matching PO line item
+    po_line_item = None
+    for po_item in po_items:
+        if po_item.get('ItemCode') == item_code:
+            po_line_item = po_item
+            break
+    
+    # Generate barcode if not provided
+    generated_barcode = None
+    if not request.form.get('supplier_barcode'):
+        import uuid
+        generated_barcode = f"WMS-{item_code}-{uuid.uuid4().hex[:8].upper()}"
+    
+    # Create GRPO item with enhanced details
     grpo_item = GRPOItem(
         grpo_document_id=grpo_doc.id,
+        po_line_number=po_line_item.get('LineNum') if po_line_item else None,
         item_code=item_code,
         item_name=request.form['item_name'],
-        quantity=quantity,
+        po_quantity=po_line_item.get('Quantity') if po_line_item else quantity,
+        open_quantity=po_line_item.get('OpenQuantity') if po_line_item else quantity,
+        received_quantity=quantity,
         unit_of_measure=request.form['unit_of_measure'],
+        unit_price=po_line_item.get('Price') if po_line_item else 0,
         bin_location=bin_location,
-        batch_number=batch_number
+        batch_number=batch_number,
+        expiration_date=datetime.strptime(request.form['expiration_date'], '%Y-%m-%d') if request.form.get('expiration_date') else None,
+        supplier_barcode=request.form.get('supplier_barcode'),
+        generated_barcode=generated_barcode
     )
     db.session.add(grpo_item)
     db.session.commit()
@@ -141,18 +170,67 @@ def add_grpo_item(grpo_id):
 def submit_grpo(grpo_id):
     grpo_doc = GRPODocument.query.get_or_404(grpo_id)
     
+    # Update status to submitted for QC approval
+    grpo_doc.status = 'submitted'
+    db.session.commit()
+    
+    flash('GRPO submitted for QC approval!', 'success')
+    return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+
+@app.route('/grpo/<int:grpo_id>/approve', methods=['POST'])
+@login_required
+def approve_grpo(grpo_id):
+    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+    
+    # Check if user has QC role
+    if current_user.role not in ['qc', 'manager', 'admin']:
+        flash('You do not have permission to approve GRPO documents.', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
     # Submit to SAP B1
     sap = SAPIntegration()
     result = sap.create_goods_receipt_po(grpo_doc)
     
     if result['success']:
-        grpo_doc.status = 'approved'
+        grpo_doc.status = 'approved' if grpo_doc.draft_or_post == 'draft' else 'posted'
         grpo_doc.sap_document_number = result['document_number']
+        grpo_doc.qc_user_id = current_user.id
+        grpo_doc.qc_notes = request.form.get('qc_notes', '')
         db.session.commit()
-        flash('GRPO submitted successfully to SAP B1!', 'success')
+        
+        # Update all items QC status
+        for item in grpo_doc.items:
+            item.qc_status = 'approved'
+        db.session.commit()
+        
+        flash('GRPO approved and posted to SAP B1!', 'success')
     else:
-        flash(f'Error submitting GRPO: {result["error"]}', 'error')
+        flash(f'Error posting GRPO to SAP: {result["error"]}', 'error')
     
+    return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+
+@app.route('/grpo/<int:grpo_id>/reject', methods=['POST'])
+@login_required
+def reject_grpo(grpo_id):
+    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+    
+    # Check if user has QC role
+    if current_user.role not in ['qc', 'manager', 'admin']:
+        flash('You do not have permission to reject GRPO documents.', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
+    grpo_doc.status = 'rejected'
+    grpo_doc.qc_user_id = current_user.id
+    grpo_doc.qc_notes = request.form.get('qc_notes', '')
+    db.session.commit()
+    
+    # Update all items QC status
+    for item in grpo_doc.items:
+        item.qc_status = 'rejected'
+        item.qc_notes = request.form.get('qc_notes', '')
+    db.session.commit()
+    
+    flash('GRPO rejected!', 'warning')
     return redirect(url_for('grpo_detail', grpo_id=grpo_id))
 
 @app.route('/inventory_transfer')
@@ -476,6 +554,93 @@ def get_bins():
     
     sap = SAPIntegration()
     bins = sap.get_warehouse_bins(warehouse)
+    
+    return jsonify({'bins': bins})
+
+# Enhanced GRPO API routes
+
+@app.route('/api/scan_po', methods=['POST'])
+@login_required
+def scan_po():
+    """API endpoint for PO barcode scanning"""
+    po_number = request.json.get('po_number')
+    
+    sap = SAPIntegration()
+    po_data = sap.get_purchase_order(po_number)
+    
+    if po_data:
+        return jsonify({
+            'success': True,
+            'po_data': {
+                'po_number': po_data.get('DocNum'),
+                'supplier_code': po_data.get('CardCode'),
+                'supplier_name': po_data.get('CardName'),
+                'po_date': po_data.get('DocDate'),
+                'total': po_data.get('DocTotal'),
+                'items': po_data.get('DocumentLines', [])
+            }
+        })
+    else:
+        return jsonify({'success': False, 'error': 'PO not found'})
+
+@app.route('/api/scan_barcode', methods=['POST'])
+@login_required  
+def scan_barcode():
+    """API endpoint for supplier barcode scanning"""
+    barcode = request.json.get('barcode')
+    
+    # This would integrate with a barcode lookup service or database
+    # For now, return mock data
+    return jsonify({
+        'success': True,
+        'item_data': {
+            'item_code': 'ITM001',
+            'batch_number': 'BTH2025001',
+            'expiration_date': '2025-12-31',
+            'serial_number': barcode
+        }
+    })
+
+@app.route('/api/generate_barcode', methods=['POST'])
+@login_required
+def generate_barcode_api():
+    """Generate new barcode for item"""
+    item_code = request.json.get('item_code')
+    batch_number = request.json.get('batch_number', '')
+    
+    import uuid
+    barcode = f"WMS-{item_code}-{uuid.uuid4().hex[:8].upper()}"
+    
+    return jsonify({
+        'success': True,
+        'barcode': barcode
+    })
+
+@app.route('/qc_dashboard')
+@login_required
+def qc_dashboard():
+    """QC Dashboard for pending approvals"""
+    if current_user.role not in ['qc', 'manager', 'admin']:
+        flash('Access denied. QC role required.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    pending_grpos = GRPODocument.query.filter_by(status='submitted').order_by(GRPODocument.created_at.desc()).all()
+    return render_template('qc_dashboard.html', pending_grpos=pending_grpos)
+
+@app.route('/api/get_bins_list')
+@login_required
+def get_bins_api():
+    """API endpoint to get available bins"""
+    warehouse = request.args.get('warehouse', 'WH01')
+    
+    # This would integrate with SAP to get real bin data
+    bins = [
+        {'code': 'A-01-01', 'name': 'Zone A - Rack 01 - Level 01', 'type': 'storage'},
+        {'code': 'A-01-02', 'name': 'Zone A - Rack 01 - Level 02', 'type': 'storage'},
+        {'code': 'B-01-01', 'name': 'Zone B - Rack 01 - Level 01', 'type': 'quarantine'},
+        {'code': 'B-01-02', 'name': 'Zone B - Rack 01 - Level 02', 'type': 'quarantine'},
+        {'code': 'C-01-01', 'name': 'Zone C - Rack 01 - Level 01', 'type': 'shipping'},
+    ]
     
     return jsonify({'bins': bins})
 

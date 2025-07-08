@@ -79,6 +79,13 @@
                             <i data-feather="search"></i> Bin Scan
                         </a>
                     </li>
+                    {% if current_user.role in ['qc', 'manager', 'admin'] %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('qc_dashboard') }}">
+                            <i data-feather="clipboard"></i> QC Dashboard
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i data-feather="printer"></i> Labels
