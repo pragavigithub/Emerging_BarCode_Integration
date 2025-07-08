@@ -35,10 +35,10 @@ login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 
 # SAP B1 Configuration
-app.config['SAP_B1_SERVER'] = os.environ.get('SAP_B1_SERVER', 'https://sapb1server:50000')
+app.config['SAP_B1_SERVER'] = os.environ.get('SAP_B1_SERVER', 'https://192.168.0.121:50000')
 app.config['SAP_B1_USERNAME'] = os.environ.get('SAP_B1_USERNAME', 'manager')
-app.config['SAP_B1_PASSWORD'] = os.environ.get('SAP_B1_PASSWORD', 'manager')
-app.config['SAP_B1_COMPANY_DB'] = os.environ.get('SAP_B1_COMPANY_DB', 'SBODEMOUS')
+app.config['SAP_B1_PASSWORD'] = os.environ.get('SAP_B1_PASSWORD', 'Ea@12345')
+app.config['SAP_B1_COMPANY_DB'] = os.environ.get('SAP_B1_COMPANY_DB', 'Test_Hutchinson')
 
 with app.app_context():
     # Import models to create tables

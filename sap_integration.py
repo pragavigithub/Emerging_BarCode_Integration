@@ -4,6 +4,9 @@ import logging
 from datetime import datetime
 from app import app
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 class SAPIntegration:
     def __init__(self):
         self.base_url = app.config['SAP_B1_SERVER']
@@ -47,7 +50,7 @@ class SAPIntegration:
         if not self.ensure_logged_in():
             return None
             
-        url = f"{self.base_url}/b1s/v1/PurchaseOrders?$filter=DocNum eq '{po_number}'"
+        url = f"{self.base_url}/b1s/v1/PurchaseOrders?$filter=DocNum eq {po_number}"
         
         try:
             response = self.session.get(url)
