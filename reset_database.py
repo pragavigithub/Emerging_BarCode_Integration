@@ -11,12 +11,18 @@ from datetime import datetime
 
 def get_database_path():
     """Get the SQLite database path"""
+    # Check environment variable first
+    database_url = os.environ.get('DATABASE_URL', '')
+    if database_url.startswith('sqlite:///'):
+        return database_url.replace('sqlite:///', '')
+    
     # Common SQLite database locations
     possible_paths = [
         'instance/database.db',
         'database.db',
         'wms.db',
-        'app.db'
+        'app.db',
+        'site.db'
     ]
     
     for path in possible_paths:

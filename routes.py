@@ -104,12 +104,27 @@ def create_grpo():
         flash('Purchase Order not found in SAP B1.', 'error')
         return redirect(url_for('grpo'))
     
+    # Parse SAP date safely (handles both ISO format and simple date format)
+    po_date = datetime.utcnow()
+    if po_data.get('DocDate'):
+        date_str = po_data.get('DocDate')
+        try:
+            # Try ISO format first (SAP B1 format: 2025-01-08T00:00:00Z)
+            if 'T' in date_str:
+                po_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            else:
+                # Simple date format
+                po_date = datetime.strptime(date_str, '%Y-%m-%d')
+        except (ValueError, TypeError) as e:
+            logging.warning(f"Could not parse PO date '{date_str}': {e}")
+            po_date = datetime.utcnow()
+
     # Create GRPO document with PO details
     grpo_doc = GRPODocument(
         po_number=po_number,
         supplier_code=po_data.get('CardCode'),
         supplier_name=po_data.get('CardName'),
-        po_date=datetime.strptime(po_data.get('DocDate', '2025-01-08'), '%Y-%m-%d') if po_data.get('DocDate') else datetime.utcnow(),
+        po_date=po_date,
         po_total=po_data.get('DocTotal', 0),
         user_id=current_user.id,
         draft_or_post=request.form.get('draft_or_post', 'draft')
@@ -123,18 +138,28 @@ def create_grpo():
 @app.route('/grpo/<int:grpo_id>')
 @login_required
 def grpo_detail(grpo_id):
-    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
-    
-    # Get PO items from SAP
-    sap = SAPIntegration()
-    po_items = sap.get_purchase_order_items(grpo_doc.po_number)
+    try:
+        grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+        
+        # Get PO items from SAP
+        sap = SAPIntegration()
+        po_items = sap.get_purchase_order_items(grpo_doc.po_number)
+    except Exception as e:
+        logging.error(f"Database error in grpo_detail: {e}")
+        flash('Database needs to be updated. Please run: python reset_database.py', 'error')
+        return redirect(url_for('grpo'))
     
     return render_template('grpo_detail.html', grpo_doc=grpo_doc, po_items=po_items)
 
 @app.route('/grpo/<int:grpo_id>/add_item', methods=['POST'])
 @login_required
 def add_grpo_item(grpo_id):
-    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+    try:
+        grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+    except Exception as e:
+        logging.error(f"Database error in add_grpo_item: {e}")
+        flash('Database needs to be updated. Please run: python reset_database.py', 'error')
+        return redirect(url_for('grpo'))
     
     item_code = request.form['item_code']
     quantity = float(request.form['quantity'])
@@ -640,7 +665,13 @@ def qc_dashboard():
         flash('Access denied. QC role required.', 'error')
         return redirect(url_for('dashboard'))
     
-    pending_grpos = GRPODocument.query.filter_by(status='submitted').order_by(GRPODocument.created_at.desc()).all()
+    try:
+        pending_grpos = GRPODocument.query.filter_by(status='submitted').order_by(GRPODocument.created_at.desc()).all()
+    except Exception as e:
+        logging.error(f"Database error in QC dashboard: {e}")
+        pending_grpos = []
+        flash('Database needs to be updated. Please run: python reset_database.py', 'warning')
+    
     return render_template('qc_dashboard.html', pending_grpos=pending_grpos)
 
 @app.route('/api/get_bins_list')
