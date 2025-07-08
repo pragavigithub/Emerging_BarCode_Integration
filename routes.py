@@ -243,26 +243,32 @@ def approve_grpo(grpo_id):
         flash('You do not have permission to approve GRPO documents.', 'error')
         return redirect(url_for('grpo_detail', grpo_id=grpo_id))
     
-    # Submit to SAP B1
-    sap = SAPIntegration()
-    result = sap.create_goods_receipt_po(grpo_doc)
+    # Get draft or post preference from form
+    grpo_doc.draft_or_post = request.form.get('draft_or_post', 'draft')
+    grpo_doc.qc_user_id = current_user.id
+    grpo_doc.qc_notes = request.form.get('qc_notes', '')
     
-    if result['success']:
-        grpo_doc.status = 'approved' if grpo_doc.draft_or_post == 'draft' else 'posted'
-        grpo_doc.sap_document_number = result['document_number']
-        grpo_doc.qc_user_id = current_user.id
-        grpo_doc.qc_notes = request.form.get('qc_notes', '')
-        db.session.commit()
+    # Update all items QC status first
+    for item in grpo_doc.items:
+        item.qc_status = 'approved'
+    
+    # If user selected 'post', submit to SAP B1
+    if grpo_doc.draft_or_post == 'post':
+        from sap_integration import sap_integration
+        result = sap_integration.post_grpo_to_sap(grpo_doc)
         
-        # Update all items QC status
-        for item in grpo_doc.items:
-            item.qc_status = 'approved'
-        db.session.commit()
-        
-        flash('GRPO approved and posted to SAP B1!', 'success')
+        if result.get('success'):
+            grpo_doc.status = 'posted'
+            grpo_doc.sap_document_number = result.get('sap_document_number')
+            flash(f'GRPO approved and posted to SAP B1 successfully! SAP Document Number: {result.get("sap_document_number")}', 'success')
+        else:
+            grpo_doc.status = 'approved'  # Keep as approved even if SAP posting fails
+            flash(f'GRPO approved but failed to post to SAP B1: {result.get("error")}', 'warning')
     else:
-        flash(f'Error posting GRPO to SAP: {result["error"]}', 'error')
+        grpo_doc.status = 'approved'
+        flash('GRPO approved successfully (saved as draft)', 'success')
     
+    db.session.commit()
     return redirect(url_for('grpo_detail', grpo_id=grpo_id))
 
 @app.route('/grpo/<int:grpo_id>/reject', methods=['POST'])
@@ -849,18 +855,70 @@ def qc_dashboard():
 @app.route('/api/get_bins_list')
 @login_required
 def get_bins_api():
-    """API endpoint to get available bins"""
-    warehouse = request.args.get('warehouse', 'WH01')
+    """API endpoint to get available bins from SAP B1"""
+    warehouse_code = request.args.get('warehouse', 'WH01')
     
-    # This would integrate with SAP to get real bin data
-    bins = [
-        {'code': 'A-01-01', 'name': 'Zone A - Rack 01 - Level 01', 'type': 'storage'},
-        {'code': 'A-01-02', 'name': 'Zone A - Rack 01 - Level 02', 'type': 'storage'},
-        {'code': 'B-01-01', 'name': 'Zone B - Rack 01 - Level 01', 'type': 'quarantine'},
-        {'code': 'B-01-02', 'name': 'Zone B - Rack 01 - Level 02', 'type': 'quarantine'},
-        {'code': 'C-01-01', 'name': 'Zone C - Rack 01 - Level 01', 'type': 'shipping'},
-    ]
+    # Get bins from SAP B1 if available
+    from sap_integration import sap_integration
+    bins = sap_integration.get_available_bins(warehouse_code)
+    
+    # If SAP is not available, return fallback bins
+    if not bins:
+        bins = [
+            {'BinCode': f'{warehouse_code}-A1-01', 'Description': 'Aisle A, Level 1, Position 1'},
+            {'BinCode': f'{warehouse_code}-A1-02', 'Description': 'Aisle A, Level 1, Position 2'},
+            {'BinCode': f'{warehouse_code}-A2-01', 'Description': 'Aisle A, Level 2, Position 1'},
+            {'BinCode': f'{warehouse_code}-B1-01', 'Description': 'Aisle B, Level 1, Position 1'},
+            {'BinCode': f'{warehouse_code}-B1-02', 'Description': 'Aisle B, Level 1, Position 2'},
+        ]
     
     return jsonify({'bins': bins})
+
+@app.route('/sync-sap-data', methods=['POST'])
+@login_required
+def sync_sap_data():
+    """Sync master data from SAP B1"""
+    if current_user.role not in ['admin', 'manager']:
+        flash('You do not have permission to sync SAP data', 'error')
+        return redirect(url_for('dashboard'))
+    
+    from sap_integration import sap_integration
+    results = sap_integration.sync_all_master_data()
+    
+    success_count = sum(1 for result in results.values() if result)
+    total_count = len(results)
+    
+    if success_count == total_count:
+        flash(f'SAP master data synchronized successfully! ({success_count}/{total_count} completed)', 'success')
+    elif success_count > 0:
+        flash(f'SAP master data partially synchronized ({success_count}/{total_count} completed)', 'warning')
+    else:
+        flash('Failed to synchronize SAP master data. Check SAP connection.', 'error')
+    
+    return redirect(url_for('dashboard'))
+
+@app.route('/post-grpo-to-sap/<int:grpo_id>', methods=['POST'])
+@login_required
+def post_grpo_to_sap_manual(grpo_id):
+    """Manually post approved GRPO to SAP B1"""
+    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+    
+    if current_user.role not in ['admin', 'manager']:
+        flash('You do not have permission to post to SAP', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
+    if grpo_doc.status != 'approved':
+        flash('GRPO must be approved before posting to SAP', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
+    from sap_integration import sap_integration
+    result = sap_integration.post_grpo_to_sap(grpo_doc)
+    
+    if result.get('success'):
+        flash(f'GRPO posted to SAP B1 successfully! SAP Document Number: {result.get("sap_document_number")}', 'success')
+    else:
+        flash(f'Failed to post GRPO to SAP B1: {result.get("error")}', 'error')
+    
+    return redirect(url_for('grpo_detail', grpo_id=grpo_id))
 
 # Default admin user is created in app.py during initialization

@@ -16,6 +16,13 @@ class SAPIntegration:
         self.session_id = None
         self.session = requests.Session()
         self.session.verify = False  # For development, in production use proper SSL
+        self.is_offline = False
+        
+        # Cache for frequently accessed data
+        self._warehouse_cache = {}
+        self._bin_cache = {}
+        self._branch_cache = {}
+        self._item_cache = {}
         
     def login(self):
         """Login to SAP B1 Service Layer"""
@@ -341,6 +348,304 @@ class SAPIntegration:
             logging.error(f"Error creating inventory counting in SAP B1: {str(e)}")
             return {'success': False, 'error': str(e)}
     
+    def sync_warehouses(self):
+        """Sync warehouses from SAP B1 to local database"""
+        if not self.ensure_logged_in():
+            logging.warning("Cannot sync warehouses - SAP B1 not available")
+            return False
+            
+        try:
+            url = f"{self.base_url}/b1s/v1/Warehouses"
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                warehouses = response.json().get('value', [])
+                
+                from app import db
+                
+                # Clear cache and update database
+                self._warehouse_cache = {}
+                
+                for wh in warehouses:
+                    # Check if warehouse exists in branches table
+                    existing = db.session.execute(
+                        db.text("SELECT id FROM branches WHERE id = :id"), 
+                        {"id": wh.get('WarehouseCode')}
+                    ).fetchone()
+                    
+                    if not existing:
+                        # Insert new warehouse as branch
+                        db.session.execute(db.text("""
+                            INSERT INTO branches (id, name, address, is_active, created_at, updated_at)
+                            VALUES (:id, :name, :address, :is_active, NOW(), NOW())
+                        """), {
+                            "id": wh.get('WarehouseCode'),
+                            "name": wh.get('WarehouseName', ''),
+                            "address": wh.get('Street', ''),
+                            "is_active": wh.get('Inactive') != 'Y'
+                        })
+                    else:
+                        # Update existing warehouse
+                        db.session.execute(db.text("""
+                            UPDATE branches SET 
+                                name = :name, 
+                                address = :address, 
+                                is_active = :is_active,
+                                updated_at = NOW()
+                            WHERE id = :id
+                        """), {
+                            "id": wh.get('WarehouseCode'),
+                            "name": wh.get('WarehouseName', ''),
+                            "address": wh.get('Street', ''),
+                            "is_active": wh.get('Inactive') != 'Y'
+                        })
+                    
+                    # Cache warehouse data
+                    self._warehouse_cache[wh.get('WarehouseCode')] = {
+                        'WarehouseCode': wh.get('WarehouseCode'),
+                        'WarehouseName': wh.get('WarehouseName'),
+                        'Address': wh.get('Street'),
+                        'Active': wh.get('Inactive') != 'Y'
+                    }
+                
+                db.session.commit()
+                logging.info(f"Synced {len(warehouses)} warehouses from SAP B1")
+                return True
+                
+        except Exception as e:
+            logging.error(f"Error syncing warehouses: {str(e)}")
+            return False
+    
+    def sync_bins(self, warehouse_code=None):
+        """Sync bin locations from SAP B1"""
+        if not self.ensure_logged_in():
+            logging.warning("Cannot sync bins - SAP B1 not available")
+            return False
+            
+        try:
+            # Get bins for specific warehouse or all warehouses
+            if warehouse_code:
+                url = f"{self.base_url}/b1s/v1/BinLocations?$filter=WarehouseCode eq '{warehouse_code}'"
+            else:
+                url = f"{self.base_url}/b1s/v1/BinLocations"
+                
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                bins = response.json().get('value', [])
+                
+                # Create bins table if not exists
+                from app import db
+                
+                db.session.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS bin_locations (
+                        id SERIAL PRIMARY KEY,
+                        bin_code VARCHAR(50) NOT NULL,
+                        warehouse_code VARCHAR(10) NOT NULL,
+                        bin_name VARCHAR(100),
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW(),
+                        UNIQUE(bin_code, warehouse_code)
+                    )
+                """))
+                
+                # Clear cache
+                self._bin_cache = {}
+                
+                for bin_data in bins:
+                    bin_code = bin_data.get('BinCode')
+                    wh_code = bin_data.get('WarehouseCode')
+                    
+                    if bin_code and wh_code:
+                        # Upsert bin location
+                        db.session.execute(db.text("""
+                            INSERT INTO bin_locations (bin_code, warehouse_code, bin_name, is_active, created_at, updated_at)
+                            VALUES (:bin_code, :warehouse_code, :bin_name, :is_active, NOW(), NOW())
+                            ON CONFLICT (bin_code, warehouse_code) 
+                            DO UPDATE SET 
+                                bin_name = EXCLUDED.bin_name,
+                                is_active = EXCLUDED.is_active,
+                                updated_at = NOW()
+                        """), {
+                            "bin_code": bin_code,
+                            "warehouse_code": wh_code,
+                            "bin_name": bin_data.get('Description', ''),
+                            "is_active": bin_data.get('Inactive') != 'Y'
+                        })
+                        
+                        # Cache bin data
+                        cache_key = f"{wh_code}:{bin_code}"
+                        self._bin_cache[cache_key] = {
+                            'BinCode': bin_code,
+                            'WarehouseCode': wh_code,
+                            'Description': bin_data.get('Description', ''),
+                            'Active': bin_data.get('Inactive') != 'Y'
+                        }
+                
+                db.session.commit()
+                logging.info(f"Synced {len(bins)} bin locations from SAP B1")
+                return True
+                
+        except Exception as e:
+            logging.error(f"Error syncing bins: {str(e)}")
+            return False
+    
+    def sync_business_partners(self):
+        """Sync business partners (suppliers/customers) from SAP B1"""
+        if not self.ensure_logged_in():
+            logging.warning("Cannot sync business partners - SAP B1 not available")
+            return False
+            
+        try:
+            # Get suppliers and customers
+            url = f"{self.base_url}/b1s/v1/BusinessPartners?$filter=CardType eq 'cSupplier' or CardType eq 'cCustomer'"
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                partners = response.json().get('value', [])
+                
+                from app import db
+                
+                # Create business_partners table if not exists
+                db.session.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS business_partners (
+                        id SERIAL PRIMARY KEY,
+                        card_code VARCHAR(50) UNIQUE NOT NULL,
+                        card_name VARCHAR(200) NOT NULL,
+                        card_type VARCHAR(20) NOT NULL,
+                        phone VARCHAR(50),
+                        email VARCHAR(100),
+                        address TEXT,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                
+                for partner in partners:
+                    card_code = partner.get('CardCode')
+                    if card_code:
+                        db.session.execute(db.text("""
+                            INSERT INTO business_partners (card_code, card_name, card_type, phone, email, address, is_active, created_at, updated_at)
+                            VALUES (:card_code, :card_name, :card_type, :phone, :email, :address, :is_active, NOW(), NOW())
+                            ON CONFLICT (card_code) 
+                            DO UPDATE SET 
+                                card_name = EXCLUDED.card_name,
+                                card_type = EXCLUDED.card_type,
+                                phone = EXCLUDED.phone,
+                                email = EXCLUDED.email,
+                                address = EXCLUDED.address,
+                                is_active = EXCLUDED.is_active,
+                                updated_at = NOW()
+                        """), {
+                            "card_code": card_code,
+                            "card_name": partner.get('CardName', ''),
+                            "card_type": partner.get('CardType', ''),
+                            "phone": partner.get('Phone1', ''),
+                            "email": partner.get('EmailAddress', ''),
+                            "address": partner.get('Address', ''),
+                            "is_active": partner.get('Valid') == 'Y'
+                        })
+                
+                db.session.commit()
+                logging.info(f"Synced {len(partners)} business partners from SAP B1")
+                return True
+                
+        except Exception as e:
+            logging.error(f"Error syncing business partners: {str(e)}")
+            return False
+    
+    def post_grpo_to_sap(self, grpo_document):
+        """Post approved GRPO to SAP B1 as Goods Receipt PO"""
+        if not self.ensure_logged_in():
+            logging.warning("Cannot post GRPO - SAP B1 not available")
+            return {'success': False, 'error': 'SAP B1 not available'}
+            
+        try:
+            url = f"{self.base_url}/b1s/v1/PurchaseDeliveryNotes"
+            
+            # Get original PO data
+            po_data = self.get_purchase_order(grpo_document.po_number)
+            if not po_data:
+                return {'success': False, 'error': f'Purchase Order {grpo_document.po_number} not found in SAP'}
+            
+            # Build GRPO document for SAP
+            grpo_data = {
+                "CardCode": grpo_document.supplier_code,
+                "DocDate": grpo_document.created_at.strftime('%Y-%m-%d'),
+                "DocDueDate": grpo_document.created_at.strftime('%Y-%m-%d'),
+                "Comments": f"WMS GRPO - PO: {grpo_document.po_number}",
+                "DocumentLines": []
+            }
+            
+            # Add document lines
+            for item in grpo_document.items:
+                line = {
+                    "ItemCode": item.item_code,
+                    "Quantity": float(item.received_quantity),
+                    "UnitPrice": float(item.unit_price) if item.unit_price else 0,
+                    "WarehouseCode": item.bin_location[:4] if len(item.bin_location) > 4 else "WH01",  # Extract warehouse from bin
+                    "BinCode": item.bin_location
+                }
+                
+                # Add batch information if available
+                if item.batch_number:
+                    line["BatchNumbers"] = [{
+                        "BatchNumber": item.batch_number,
+                        "Quantity": float(item.received_quantity)
+                    }]
+                    
+                    # Add expiration date if available
+                    if item.expiration_date:
+                        line["BatchNumbers"][0]["ExpiryDate"] = item.expiration_date.strftime('%Y-%m-%d')
+                
+                grpo_data["DocumentLines"].append(line)
+            
+            # Post to SAP
+            response = self.session.post(url, json=grpo_data)
+            
+            if response.status_code in [200, 201]:
+                result = response.json()
+                sap_doc_number = result.get('DocNum')
+                
+                # Update WMS record with SAP document number
+                grpo_document.sap_document_number = str(sap_doc_number)
+                grpo_document.status = 'posted'
+                
+                from app import db
+                db.session.commit()
+                
+                logging.info(f"GRPO posted to SAP B1 with document number: {sap_doc_number}")
+                return {
+                    'success': True, 
+                    'sap_document_number': sap_doc_number,
+                    'message': f'GRPO posted to SAP B1 successfully as document {sap_doc_number}'
+                }
+            else:
+                error_msg = response.text
+                logging.error(f"Failed to post GRPO to SAP: {error_msg}")
+                return {'success': False, 'error': f'SAP B1 Error: {error_msg}'}
+                
+        except Exception as e:
+            logging.error(f"Error posting GRPO to SAP: {str(e)}")
+            return {'success': False, 'error': f'Error posting to SAP: {str(e)}'}
+    
+    def sync_all_master_data(self):
+        """Sync all master data from SAP B1"""
+        logging.info("Starting full SAP B1 master data synchronization...")
+        
+        results = {
+            'warehouses': self.sync_warehouses(),
+            'bins': self.sync_bins(),
+            'business_partners': self.sync_business_partners()
+        }
+        
+        success_count = sum(1 for result in results.values() if result)
+        logging.info(f"Master data sync completed: {success_count}/{len(results)} successful")
+        
+        return results
+
     def logout(self):
         """Logout from SAP B1"""
         if self.session_id:

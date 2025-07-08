@@ -131,3 +131,10 @@ Changelog:
   - Added environment configuration examples
   - Improved database connection handling with proper fallbacks
   - Added pyodbc dependency for SQL Server connectivity
+- July 08, 2025. Comprehensive SAP B1 Integration Enhancement:
+  - Implemented complete SAP master data synchronization (warehouses, bins, business partners)
+  - Added automated GRPO approval-to-posting workflow with draft/post options
+  - Enhanced bin location synchronization with real-time SAP data
+  - Added manual posting capability for approved GRPOs
+  - Integrated SAP data sync button in admin dashboard
+  - Improved error handling with offline mode graceful fallback
