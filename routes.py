@@ -859,7 +859,8 @@ def get_bins_api():
     warehouse_code = request.args.get('warehouse', 'WH01')
     
     # Get bins from SAP B1 if available
-    from sap_integration import sap_integration
+    from sap_integration import SAPIntegration
+    sap_integration = SAPIntegration()
     bins = sap_integration.get_available_bins(warehouse_code)
     
     # If SAP is not available, return fallback bins
@@ -882,7 +883,8 @@ def sync_sap_data():
         flash('You do not have permission to sync SAP data', 'error')
         return redirect(url_for('dashboard'))
     
-    from sap_integration import sap_integration
+    from sap_integration import SAPIntegration
+    sap_integration = SAPIntegration()
     results = sap_integration.sync_all_master_data()
     
     success_count = sum(1 for result in results.values() if result)
@@ -911,7 +913,8 @@ def post_grpo_to_sap_manual(grpo_id):
         flash('GRPO must be approved before posting to SAP', 'error')
         return redirect(url_for('grpo_detail', grpo_id=grpo_id))
     
-    from sap_integration import sap_integration
+    from sap_integration import SAPIntegration
+    sap_integration = SAPIntegration()
     result = sap_integration.post_grpo_to_sap(grpo_doc)
     
     if result.get('success'):

@@ -183,6 +183,35 @@ class SAPIntegration:
             logging.error(f"Error fetching items for bin {bin_code}: {str(e)}")
             return []
     
+    def get_available_bins(self, warehouse_code):
+        """Get available bins for a warehouse"""
+        if not self.ensure_logged_in():
+            # Return fallback bins if SAP is not available
+            return []
+            
+        try:
+            # Get bins from SAP B1
+            url = f"{self.base_url}/b1s/v1/BinLocations"
+            params = {'$filter': f"Warehouse eq '{warehouse_code}' and Active eq 'Y'"}
+            
+            response = self.session.get(url, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                bins = []
+                for bin_data in data.get('value', []):
+                    bins.append({
+                        'BinCode': bin_data.get('BinCode'),
+                        'Description': bin_data.get('Description', '')
+                    })
+                return bins
+            else:
+                logging.error(f"Failed to get bins from SAP: {response.text}")
+                return []
+                
+        except Exception as e:
+            logging.error(f"Error getting bins from SAP: {str(e)}")
+            return []
+    
     def create_goods_receipt_po(self, grpo_document):
         """Create Goods Receipt PO in SAP B1"""
         if not self.ensure_logged_in():
