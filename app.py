@@ -24,11 +24,16 @@ app.secret_key = os.environ.get(
     "SESSION_SECRET") or "dev-secret-key-change-in-production"
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Database configuration - PostgreSQL required for Replit
+# Database configuration
 database_url = os.environ.get("DATABASE_URL")
-if not database_url:
-    raise ValueError("DATABASE_URL environment variable is required")
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+if database_url:
+    # Production/Replit environment with PostgreSQL
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    logging.info("Using PostgreSQL database")
+else:
+    # Local development fallback to SQLite
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///instance/wms.db"
+    logging.info("Using SQLite database for local development")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,

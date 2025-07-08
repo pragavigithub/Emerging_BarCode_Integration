@@ -23,18 +23,31 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        branch_id = request.form.get('branch_id')
+        branch_id = request.form.get('branch_id', '').strip()
         
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
             if user.is_active:
-                # Update branch if provided
+                # Update branch - use provided branch, default branch, or 'HQ001'
                 if branch_id:
                     user.branch_id = branch_id
-                    db.session.commit()
+                elif user.default_branch_id:
+                    user.branch_id = user.default_branch_id
+                elif not user.branch_id:
+                    user.branch_id = 'HQ001'  # Default to head office
+                
+                # Update last login
+                user.last_login = datetime.utcnow()
+                db.session.commit()
                 
                 login_user(user)
+                
+                # Check if password change is required
+                if user.must_change_password:
+                    flash('You must change your password before continuing.', 'warning')
+                    return redirect(url_for('change_password'))
+                
                 flash('Logged in successfully!', 'success')
                 return redirect(url_for('dashboard'))
             else:
@@ -42,7 +55,9 @@ def login():
         else:
             flash('Invalid username or password.', 'error')
     
-    return render_template('login.html')
+    # Get available branches for login form
+    branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
+    return render_template('login.html', branches=branches)
 
 @app.route('/logout')
 @login_required
@@ -522,17 +537,18 @@ def reprint_label():
 @app.route('/user_management')
 @login_required
 def user_management():
-    if current_user.role != 'admin':
-        flash('You do not have permission to access user management.', 'error')
+    if not current_user.has_permission('user_management'):
+        flash('Access denied. You do not have permission to manage users.', 'error')
         return redirect(url_for('dashboard'))
     
     users = User.query.all()
-    return render_template('user_management.html', users=users)
+    branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
+    return render_template('user_management.html', users=users, branches=branches)
 
 @app.route('/user_management/create', methods=['POST'])
 @login_required
 def create_user():
-    if current_user.role != 'admin':
+    if not current_user.has_permission('user_management'):
         flash('You do not have permission to create users.', 'error')
         return redirect(url_for('dashboard'))
     
@@ -540,10 +556,18 @@ def create_user():
     email = request.form['email']
     password = request.form['password']
     role = request.form['role']
+    first_name = request.form['first_name']
+    last_name = request.form['last_name']
+    default_branch_id = request.form.get('default_branch_id')
+    must_change_password = 'must_change_password' in request.form
     
     # Check if user exists
     if User.query.filter_by(username=username).first():
         flash('Username already exists.', 'error')
+        return redirect(url_for('user_management'))
+    
+    if User.query.filter_by(email=email).first():
+        flash('Email already exists.', 'error')
         return redirect(url_for('user_management'))
     
     # Create user
@@ -551,15 +575,163 @@ def create_user():
         username=username,
         email=email,
         password_hash=generate_password_hash(password),
-        first_name=request.form['first_name'],
-        last_name=request.form['last_name'],
-        role=role
+        first_name=first_name,
+        last_name=last_name,
+        role=role,
+        default_branch_id=default_branch_id if default_branch_id else None,
+        must_change_password=must_change_password
     )
+    
+    # Set custom permissions if provided
+    permissions = {}
+    for screen in ['dashboard', 'grpo', 'inventory_transfer', 'pick_list', 'inventory_counting', 
+                   'bin_scanning', 'label_printing', 'user_management', 'qc_dashboard']:
+        permissions[screen] = screen in request.form
+    
+    user.set_permissions(permissions)
+    
     db.session.add(user)
     db.session.commit()
     
-    flash('User created successfully!', 'success')
+    flash(f'User {username} created successfully!', 'success')
     return redirect(url_for('user_management'))
+
+@app.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def edit_user(user_id):
+    if not current_user.has_permission('user_management'):
+        flash('Access denied. You do not have permission to edit users.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        user.first_name = request.form['first_name']
+        user.last_name = request.form['last_name']
+        user.email = request.form['email']
+        user.role = request.form['role']
+        user.default_branch_id = request.form.get('default_branch_id') or None
+        user.is_active = 'is_active' in request.form
+        user.must_change_password = 'must_change_password' in request.form
+        
+        # Update permissions
+        permissions = {}
+        for screen in ['dashboard', 'grpo', 'inventory_transfer', 'pick_list', 'inventory_counting', 
+                       'bin_scanning', 'label_printing', 'user_management', 'qc_dashboard']:
+            permissions[screen] = screen in request.form
+        
+        user.set_permissions(permissions)
+        user.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        flash(f'User {user.username} updated successfully!', 'success')
+        return redirect(url_for('user_management'))
+    
+    branches = db.session.execute(db.text("SELECT id, name FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
+    return render_template('edit_user.html', user=user, branches=branches)
+
+@app.route('/reset_password/<int:user_id>', methods=['POST'])
+@login_required
+def reset_password(user_id):
+    if not current_user.has_permission('user_management'):
+        flash('Access denied. You do not have permission to reset passwords.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(user_id)
+    new_password = request.form['new_password']
+    
+    user.password_hash = generate_password_hash(new_password)
+    user.must_change_password = True  # Force user to change password on next login
+    user.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    flash(f'Password reset for user {user.username}. They must change it on next login.', 'success')
+    return redirect(url_for('user_management'))
+
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form['current_password']
+        new_password = request.form['new_password']
+        confirm_password = request.form['confirm_password']
+        
+        if not check_password_hash(current_user.password_hash, current_password):
+            flash('Current password is incorrect.', 'error')
+            return render_template('change_password.html')
+        
+        if new_password != confirm_password:
+            flash('New passwords do not match.', 'error')
+            return render_template('change_password.html')
+        
+        if len(new_password) < 6:
+            flash('Password must be at least 6 characters long.', 'error')
+            return render_template('change_password.html')
+        
+        current_user.password_hash = generate_password_hash(new_password)
+        current_user.must_change_password = False
+        current_user.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        flash('Password changed successfully!', 'success')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('change_password.html')
+
+@app.route('/branch_management')
+@login_required
+def branch_management():
+    if current_user.role != 'admin':
+        flash('Access denied. Only administrators can manage branches.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    branches = db.session.execute(db.text("SELECT * FROM branches ORDER BY name")).fetchall()
+    return render_template('branch_management.html', branches=branches)
+
+@app.route('/create_branch', methods=['POST'])
+@login_required
+def create_branch():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    branch_id = request.form['branch_id'].upper()
+    name = request.form['name']
+    address = request.form.get('address', '')
+    phone = request.form.get('phone', '')
+    email = request.form.get('email', '')
+    manager_name = request.form.get('manager_name', '')
+    is_default = 'is_default' in request.form
+    
+    # Check if branch exists
+    existing = db.session.execute(db.text("SELECT id FROM branches WHERE id = :id"), {"id": branch_id}).fetchone()
+    if existing:
+        flash('Branch ID already exists.', 'error')
+        return redirect(url_for('branch_management'))
+    
+    # If this is the new default, remove default from others
+    if is_default:
+        db.session.execute(db.text("UPDATE branches SET is_default = FALSE"))
+    
+    # Insert new branch
+    db.session.execute(db.text("""
+        INSERT INTO branches (id, name, address, phone, email, manager_name, is_default, is_active)
+        VALUES (:id, :name, :address, :phone, :email, :manager_name, :is_default, TRUE)
+    """), {
+        "id": branch_id,
+        "name": name, 
+        "address": address,
+        "phone": phone,
+        "email": email,
+        "manager_name": manager_name,
+        "is_default": is_default
+    })
+    
+    db.session.commit()
+    flash(f'Branch {name} created successfully!', 'success')
+    return redirect(url_for('branch_management'))
 
 # API endpoints for barcode scanning
 @app.route('/api/validate_po', methods=['POST'])

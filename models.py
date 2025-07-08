@@ -17,9 +17,80 @@ class User(UserMixin, db.Model):
     role = Column(String(20), nullable=False, default='user')  # admin, manager, user, qc
     branch_id = Column(String(10), nullable=True)
     branch_name = Column(String(100), nullable=True)
+    default_branch_id = Column(String(10), nullable=True)  # Default branch if none selected
     is_active = Column(Boolean, default=True)
+    must_change_password = Column(Boolean, default=False)  # Force password change on next login
+    last_login = Column(DateTime, nullable=True)
+    permissions = Column(Text, nullable=True)  # JSON string of screen permissions
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def get_permissions(self):
+        """Get user permissions as a dictionary"""
+        import json
+        if self.permissions:
+            try:
+                return json.loads(self.permissions)
+            except:
+                return {}
+        return self.get_default_permissions()
+    
+    def set_permissions(self, perms_dict):
+        """Set user permissions from a dictionary"""
+        import json
+        self.permissions = json.dumps(perms_dict)
+    
+    def get_default_permissions(self):
+        """Get default permissions based on role"""
+        permissions = {
+            'dashboard': True,
+            'grpo': False,
+            'inventory_transfer': False,
+            'pick_list': False,
+            'inventory_counting': False,
+            'bin_scanning': False,
+            'label_printing': False,
+            'user_management': False,
+            'qc_dashboard': False
+        }
+        
+        if self.role == 'admin':
+            # Admin has access to everything
+            for key in permissions:
+                permissions[key] = True
+        elif self.role == 'manager':
+            permissions.update({
+                'grpo': True,
+                'inventory_transfer': True,
+                'pick_list': True,
+                'inventory_counting': True,
+                'bin_scanning': True,
+                'label_printing': True,
+                'user_management': True
+            })
+        elif self.role == 'qc':
+            permissions.update({
+                'grpo': True,
+                'qc_dashboard': True,
+                'bin_scanning': True
+            })
+        elif self.role == 'user':
+            permissions.update({
+                'grpo': True,
+                'inventory_transfer': True,
+                'pick_list': True,
+                'inventory_counting': True,
+                'bin_scanning': True,
+                'label_printing': True
+            })
+        
+        return permissions
+    
+    def has_permission(self, screen):
+        """Check if user has permission for a specific screen"""
+        if self.role == 'admin':
+            return True
+        return self.get_permissions().get(screen, False)
     
     # Relationships
     grpo_documents = relationship('GRPODocument', back_populates='user', foreign_keys='GRPODocument.user_id')
