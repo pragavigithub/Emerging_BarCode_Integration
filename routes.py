@@ -222,6 +222,32 @@ def inventory_counting_detail(count_id):
     count = InventoryCount.query.get_or_404(count_id)
     return render_template('inventory_counting_detail.html', count=count)
 
+@app.route('/create_count_task', methods=['POST'])
+@login_required
+def create_count_task():
+    count_number = request.form.get('count_number')
+    warehouse_code = request.form.get('warehouse_code')
+    bin_location = request.form.get('bin_location')
+    
+    if not count_number or not warehouse_code or not bin_location:
+        flash('All fields are required', 'error')
+        return redirect(url_for('inventory_counting'))
+    
+    # Create new count task
+    count = InventoryCount(
+        count_number=count_number,
+        warehouse_code=warehouse_code,
+        bin_location=bin_location,
+        user_id=current_user.id,
+        status='assigned'
+    )
+    
+    db.session.add(count)
+    db.session.commit()
+    
+    flash('Count task created successfully', 'success')
+    return redirect(url_for('inventory_counting'))
+
 @app.route('/bin_scanning')
 @login_required
 def bin_scanning():
@@ -246,8 +272,12 @@ def label_printing():
 @app.route('/api/print_label', methods=['POST'])
 @login_required
 def print_label():
-    item_code = request.json['item_code']
-    label_format = request.json.get('label_format', 'standard')
+    data = request.get_json()
+    if not data or 'item_code' not in data:
+        return jsonify({'error': 'item_code is required'}), 400
+    
+    item_code = data['item_code']
+    label_format = data.get('label_format', 'standard')
     
     # Generate barcode and print label
     barcode = f"ITM_{item_code}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
