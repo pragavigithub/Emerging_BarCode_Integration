@@ -31,10 +31,32 @@ if database_url:
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     logging.info("Using PostgreSQL database")
 else:
-    # Local development - create SQLite database
-    os.makedirs("instance", exist_ok=True)
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///instance/wms.db"
-    logging.info("Using SQLite database for local development")
+    # Local development - create SQLite database with proper path handling
+    import os
+    import tempfile
+    
+    # Try to create instance directory in current working directory
+    try:
+        instance_dir = os.path.join(os.getcwd(), "instance")
+        os.makedirs(instance_dir, exist_ok=True)
+        db_path = os.path.join(instance_dir, "wms.db")
+        
+        # Test if we can write to this location
+        test_file = os.path.join(instance_dir, "test.tmp")
+        with open(test_file, 'w') as f:
+            f.write("test")
+        os.remove(test_file)
+        
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+        logging.info(f"Using SQLite database for local development: {db_path}")
+        
+    except (OSError, PermissionError) as e:
+        # Fallback to temp directory
+        logging.warning(f"Cannot create database in instance directory: {e}")
+        temp_dir = tempfile.gettempdir()
+        db_path = os.path.join(temp_dir, "wms.db")
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+        logging.info(f"Using SQLite database in temp directory: {db_path}")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
