@@ -7,11 +7,23 @@ no such column: grpo_documents.supplier_code
 ```
 
 ## Solution
-Run the migration script to update your local database schema.
+Choose one of the following solutions based on your preference:
 
 ## Steps
 
-### Option 1: Quick Migration (Recommended)
+### Option 1: Database Reset (Recommended - Easy & Fast)
+**⚠️ This will delete all existing data!**
+
+1. **Stop your local Flask application** if it's running
+2. **Navigate to your project directory** in terminal/command prompt
+3. **Run the reset script:**
+   ```bash
+   python reset_database.py
+   ```
+4. **Restart your Flask application**
+5. **Login with:** Username: `admin`, Password: `admin123`
+
+### Option 2: Database Migration (Preserves Data)
 1. **Stop your local Flask application** if it's running
 2. **Navigate to your project directory** in terminal/command prompt
 3. **Run the migration script:**
@@ -20,7 +32,7 @@ Run the migration script to update your local database schema.
    ```
 4. **Restart your Flask application**
 
-### Option 2: Manual Database Recreation
+### Option 3: Manual Database Recreation
 If the migration script doesn't work, you can recreate the database:
 
 1. **Stop your Flask application**

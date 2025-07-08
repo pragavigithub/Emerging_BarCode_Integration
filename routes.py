@@ -54,25 +54,41 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Get dashboard statistics
-    grpo_count = GRPODocument.query.filter_by(user_id=current_user.id).count()
-    transfer_count = InventoryTransfer.query.filter_by(user_id=current_user.id).count()
-    pick_list_count = PickList.query.filter_by(user_id=current_user.id).count()
-    count_tasks = InventoryCount.query.filter_by(user_id=current_user.id).count()
-    
-    stats = {
-        'grpo_count': grpo_count,
-        'transfer_count': transfer_count,
-        'pick_list_count': pick_list_count,
-        'count_tasks': count_tasks
-    }
+    try:
+        # Get dashboard statistics
+        grpo_count = GRPODocument.query.filter_by(user_id=current_user.id).count()
+        transfer_count = InventoryTransfer.query.filter_by(user_id=current_user.id).count()
+        pick_list_count = PickList.query.filter_by(user_id=current_user.id).count()
+        count_tasks = InventoryCount.query.filter_by(user_id=current_user.id).count()
+        
+        stats = {
+            'grpo_count': grpo_count,
+            'transfer_count': transfer_count,
+            'pick_list_count': pick_list_count,
+            'count_tasks': count_tasks
+        }
+    except Exception as e:
+        logging.error(f"Database error in dashboard: {e}")
+        # Handle database schema mismatch gracefully
+        stats = {
+            'grpo_count': 0,
+            'transfer_count': 0,
+            'pick_list_count': 0,
+            'count_tasks': 0
+        }
+        flash('Database needs to be updated. Please run: python migrate_database.py', 'warning')
     
     return render_template('dashboard.html', stats=stats)
 
 @app.route('/grpo')
 @login_required
 def grpo():
-    documents = GRPODocument.query.filter_by(user_id=current_user.id).order_by(GRPODocument.created_at.desc()).all()
+    try:
+        documents = GRPODocument.query.filter_by(user_id=current_user.id).order_by(GRPODocument.created_at.desc()).all()
+    except Exception as e:
+        logging.error(f"Database error in grpo: {e}")
+        documents = []
+        flash('Database needs to be updated. Please run: python migrate_database.py', 'warning')
     return render_template('grpo.html', documents=documents)
 
 @app.route('/grpo/create', methods=['POST'])
