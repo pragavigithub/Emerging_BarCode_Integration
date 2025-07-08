@@ -195,6 +195,30 @@ def pick_list_detail(pick_list_id):
     pick_list = PickList.query.get_or_404(pick_list_id)
     return render_template('pick_list_detail.html', pick_list=pick_list)
 
+@app.route('/create_pick_list', methods=['POST'])
+@login_required
+def create_pick_list():
+    sales_order_number = request.form.get('sales_order_number')
+    pick_list_number = request.form.get('pick_list_number')
+    
+    if not sales_order_number or not pick_list_number:
+        flash('Sales order number and pick list number are required', 'error')
+        return redirect(url_for('pick_list'))
+    
+    # Create new pick list
+    pick_list = PickList(
+        sales_order_number=sales_order_number,
+        pick_list_number=pick_list_number,
+        user_id=current_user.id,
+        status='pending'
+    )
+    
+    db.session.add(pick_list)
+    db.session.commit()
+    
+    flash('Pick list created successfully', 'success')
+    return redirect(url_for('pick_list_detail', pick_list_id=pick_list.id))
+
 @app.route('/pick_list/<int:pick_list_id>/approve', methods=['POST'])
 @login_required
 def approve_pick_list(pick_list_id):
@@ -209,6 +233,19 @@ def approve_pick_list(pick_list_id):
         flash('You do not have permission to approve pick lists.', 'error')
     
     return redirect(url_for('pick_list_detail', pick_list_id=pick_list_id))
+
+@app.route('/pick_list/<int:pick_list_id>/reject', methods=['POST'])
+@login_required
+def reject_pick_list(pick_list_id):
+    pick_list = PickList.query.get_or_404(pick_list_id)
+    
+    if current_user.role in ['admin', 'manager']:
+        pick_list.status = 'rejected'
+        pick_list.approver_id = current_user.id
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Pick list rejected successfully'})
+    else:
+        return jsonify({'success': False, 'message': 'You do not have permission to reject pick lists'}), 403
 
 @app.route('/inventory_counting')
 @login_required
@@ -247,6 +284,56 @@ def create_count_task():
     
     flash('Count task created successfully', 'success')
     return redirect(url_for('inventory_counting'))
+
+@app.route('/inventory_counting/<int:count_id>/start', methods=['POST'])
+@login_required
+def start_count_task(count_id):
+    count = InventoryCount.query.get_or_404(count_id)
+    
+    if count.user_id != current_user.id:
+        flash('You can only start your own count tasks', 'error')
+        return redirect(url_for('inventory_counting'))
+    
+    count.status = 'in_progress'
+    db.session.commit()
+    
+    flash('Count task started', 'success')
+    return redirect(url_for('inventory_counting_detail', count_id=count_id))
+
+@app.route('/inventory_counting/<int:count_id>/complete', methods=['POST'])
+@login_required
+def complete_count_task(count_id):
+    count = InventoryCount.query.get_or_404(count_id)
+    
+    if count.user_id != current_user.id:
+        flash('You can only complete your own count tasks', 'error')
+        return redirect(url_for('inventory_counting'))
+    
+    count.status = 'completed'
+    db.session.commit()
+    
+    flash('Count task completed successfully', 'success')
+    return redirect(url_for('inventory_counting'))
+
+@app.route('/api/pending_approvals')
+@login_required
+def get_pending_approvals():
+    if current_user.role not in ['admin', 'manager']:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    pending_pick_lists = PickList.query.filter_by(status='pending').all()
+    
+    data = []
+    for pick_list in pending_pick_lists:
+        data.append({
+            'id': pick_list.id,
+            'pick_list_number': pick_list.pick_list_number,
+            'sales_order_number': pick_list.sales_order_number,
+            'user_name': f"{pick_list.user.first_name} {pick_list.user.last_name}",
+            'created_at': pick_list.created_at.strftime('%Y-%m-%d %H:%M')
+        })
+    
+    return jsonify({'pending_approvals': data})
 
 @app.route('/bin_scanning')
 @login_required
