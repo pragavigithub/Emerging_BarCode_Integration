@@ -118,3 +118,8 @@ Preferred communication style: Simple, everyday language.
 
 Changelog:
 - July 08, 2025. Initial setup
+- July 08, 2025. Migration completed from Replit Agent to Replit environment:
+  - Added PostgreSQL database with proper environment variables
+  - Fixed missing template files (grpo_detail.html, inventory_transfer_detail.html)
+  - Updated SAP integration to handle offline mode gracefully
+  - Application now runs without errors on Replit
