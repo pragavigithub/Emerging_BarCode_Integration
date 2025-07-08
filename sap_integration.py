@@ -19,6 +19,11 @@ class SAPIntegration:
         
     def login(self):
         """Login to SAP B1 Service Layer"""
+        # Check if SAP configuration exists
+        if not self.base_url or not self.username or not self.password or not self.company_db:
+            logging.warning("SAP B1 configuration not complete. Running in offline mode.")
+            return False
+            
         login_url = f"{self.base_url}/b1s/v1/Login"
         login_data = {
             "UserName": self.username,
@@ -27,16 +32,16 @@ class SAPIntegration:
         }
         
         try:
-            response = self.session.post(login_url, json=login_data)
+            response = self.session.post(login_url, json=login_data, timeout=10)
             if response.status_code == 200:
                 self.session_id = response.json().get('SessionId')
                 logging.info("Successfully logged in to SAP B1")
                 return True
             else:
-                logging.error(f"SAP B1 login failed: {response.text}")
+                logging.warning(f"SAP B1 login failed: {response.text}. Running in offline mode.")
                 return False
         except Exception as e:
-            logging.error(f"SAP B1 login error: {str(e)}")
+            logging.warning(f"SAP B1 login error: {str(e)}. Running in offline mode.")
             return False
     
     def ensure_logged_in(self):
@@ -65,9 +70,12 @@ class SAPIntegration:
     
     def get_purchase_order_items(self, po_number):
         """Get purchase order line items"""
-        po_data = self.get_purchase_order(po_number)
-        if po_data:
-            return po_data.get('DocumentLines', [])
+        try:
+            po_data = self.get_purchase_order(po_number)
+            if po_data:
+                return po_data.get('DocumentLines', [])
+        except Exception as e:
+            logging.warning(f"Unable to fetch PO items for {po_number}: {str(e)}. Running in offline mode.")
         return []
     
     def get_item_master(self, item_code):

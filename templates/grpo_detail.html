@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}GRPO Detail - {{ grpo_doc.po_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('grpo') }}">GRPO</a></li>
+                    <li class="breadcrumb-item active">{{ grpo_doc.po_number }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- GRPO Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i data-feather="package"></i> 
+                            Goods Receipt PO - {{ grpo_doc.po_number }}
+                        </h5>
+                        <div>
+                            {% if grpo_doc.status == 'draft' %}
+                                <span class="badge bg-secondary">Draft</span>
+                            {% elif grpo_doc.status == 'approved' %}
+                                <span class="badge bg-success">Approved</span>
+                            {% elif grpo_doc.status == 'posted' %}
+                                <span class="badge bg-primary">Posted</span>
+                            {% elif grpo_doc.status == 'rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>PO Number:</strong> {{ grpo_doc.po_number }}</p>
+                            <p><strong>SAP Document:</strong> {{ grpo_doc.sap_document_number or 'Not assigned' }}</p>
+                            <p><strong>Status:</strong> {{ grpo_doc.status.title() }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Created By:</strong> {{ grpo_doc.user.first_name }} {{ grpo_doc.user.last_name }}</p>
+                            <p><strong>Created At:</strong> {{ grpo_doc.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            <p><strong>Updated At:</strong> {{ grpo_doc.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Purchase Order Items -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i data-feather="list"></i> 
+                        Purchase Order Items
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if po_items and po_items|length > 0 %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item Code</th>
+                                    <th>Description</th>
+                                    <th>Quantity</th>
+                                    <th>UoM</th>
+                                    <th>Price</th>
+                                    <th>Total</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in po_items %}
+                                <tr>
+                                    <td><strong>{{ item.ItemCode or item.item_code or 'N/A' }}</strong></td>
+                                    <td>{{ item.ItemName or item.item_name or item.Description or 'N/A' }}</td>
+                                    <td>{{ item.Quantity or item.quantity or 0 }}</td>
+                                    <td>{{ item.UnitOfMeasure or item.unit_of_measure or item.UoM or 'EA' }}</td>
+                                    <td>${{ "%.2f"|format(item.Price or item.price or 0) }}</td>
+                                    <td>${{ "%.2f"|format((item.Quantity or item.quantity or 0) * (item.Price or item.price or 0)) }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}')">
+                                            <i data-feather="plus"></i> Add
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i data-feather="info"></i>
+                        No purchase order items found. This may be due to SAP connection issues or the PO number may not exist.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GRPO Items -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i data-feather="check-square"></i> 
+                            Received Items
+                        </h6>
+                        <button class="btn btn-sm btn-success" onclick="showAddItemModal()">
+                            <i data-feather="plus"></i> Add Item
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if grpo_doc.items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item Code</th>
+                                    <th>Description</th>
+                                    <th>Quantity</th>
+                                    <th>UoM</th>
+                                    <th>Bin Location</th>
+                                    <th>Batch</th>
+                                    <th>Expiry</th>
+                                    <th>Barcode</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in grpo_doc.items %}
+                                <tr>
+                                    <td><strong>{{ item.item_code }}</strong></td>
+                                    <td>{{ item.item_name }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.unit_of_measure }}</td>
+                                    <td>{{ item.bin_location }}</td>
+                                    <td>{{ item.batch_number or '-' }}</td>
+                                    <td>{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '-' }}</td>
+                                    <td>{{ item.barcode or '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger" onclick="removeItem({{ item.id }})">
+                                            <i data-feather="trash-2"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i data-feather="info"></i>
+                        No items have been received yet. Add items from the purchase order above.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('grpo') }}" class="btn btn-secondary">
+                            <i data-feather="arrow-left"></i> Back to GRPO List
+                        </a>
+                        <div>
+                            {% if grpo_doc.status == 'draft' %}
+                            <button class="btn btn-success" onclick="submitGRPO({{ grpo_doc.id }})">
+                                <i data-feather="check"></i> Submit for Approval
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Item to GRPO</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addItemForm" method="POST" action="{{ url_for('add_grpo_item', grpo_id=grpo_doc.id) }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="item_code" class="form-label">Item Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="item_code" name="item_code" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="item_name" class="form-label">Item Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="item_name" name="item_name" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="quantity" name="quantity" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="unit_of_measure" class="form-label">UoM <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="unit_of_measure" name="unit_of_measure" value="EA" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bin_location" class="form-label">Bin Location <span class="text-danger">*</span></label>
+                        <select class="form-select" id="bin_location" name="bin_location" required>
+                            <option value="">Select Bin Location</option>
+                            <option value="A-01-01">A-01-01</option>
+                            <option value="A-01-02">A-01-02</option>
+                            <option value="B-01-01">B-01-01</option>
+                            <option value="B-01-02">B-01-02</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="batch_number" class="form-label">Batch Number</label>
+                                <input type="text" class="form-control" id="batch_number" name="batch_number">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="expiration_date" class="form-label">Expiration Date</label>
+                                <input type="date" class="form-control" id="expiration_date" name="expiration_date">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="barcode" class="form-label">Barcode</label>
+                        <input type="text" class="form-control" id="barcode" name="barcode">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showAddItemModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    modal.show();
+}
+
+function addItemToGRPO(itemCode) {
+    // Pre-fill the modal with item code
+    document.getElementById('item_code').value = itemCode;
+    showAddItemModal();
+}
+
+function submitGRPO(grpoId) {
+    if (confirm('Are you sure you want to submit this GRPO for approval?')) {
+        fetch(`/grpo/${grpoId}/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Error submitting GRPO');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error submitting GRPO');
+        });
+    }
+}
+
+function removeItem(itemId) {
+    if (confirm('Are you sure you want to remove this item?')) {
+        // Implementation for removing item
+        console.log('Remove item:', itemId);
+    }
+}
+</script>
+{% endblock %}
