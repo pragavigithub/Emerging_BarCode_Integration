@@ -254,8 +254,8 @@ def approve_grpo(grpo_id):
     
     # If user selected 'post', submit to SAP B1
     if grpo_doc.draft_or_post == 'post':
-        from sap_integration import sap_integration
-        result = sap_integration.post_grpo_to_sap(grpo_doc)
+        sap = SAPIntegration()
+        result = sap.post_grpo_to_sap(grpo_doc)
         
         if result.get('success'):
             grpo_doc.status = 'posted'

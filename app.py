@@ -29,6 +29,12 @@ database_url = os.environ.get("DATABASE_URL")
 if database_url:
     # Replit environment with PostgreSQL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+        "pool_size": 10,
+        "max_overflow": 20
+    }
     logging.info("Using PostgreSQL database")
 else:
     # Local development - create SQLite database with proper path handling
