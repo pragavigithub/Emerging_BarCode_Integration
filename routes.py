@@ -295,6 +295,41 @@ def reject_grpo(grpo_id):
     flash('GRPO rejected!', 'warning')
     return redirect(url_for('grpo_detail', grpo_id=grpo_id))
 
+@app.route('/grpo/<int:grpo_id>/item/<int:item_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_grpo_item(grpo_id, item_id):
+    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+    grpo_item = GRPOItem.query.get_or_404(item_id)
+    
+    # Check if user has permission to edit
+    if grpo_doc.user_id != current_user.id and current_user.role not in ['manager', 'admin']:
+        flash('You do not have permission to edit this item.', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
+    # Check if GRPO is still editable
+    if grpo_doc.status not in ['draft', 'rejected']:
+        flash('Cannot edit items in approved or posted GRPO.', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
+    if request.method == 'POST':
+        # Update only the received quantity
+        new_quantity = float(request.form.get('received_quantity', grpo_item.received_quantity))
+        grpo_item.received_quantity = new_quantity
+        
+        # Update any other allowed fields
+        if request.form.get('bin_location'):
+            grpo_item.bin_location = request.form.get('bin_location')
+        if request.form.get('batch_number'):
+            grpo_item.batch_number = request.form.get('batch_number')
+        if request.form.get('expiration_date'):
+            grpo_item.expiration_date = datetime.strptime(request.form.get('expiration_date'), '%Y-%m-%d')
+        
+        db.session.commit()
+        flash('Item updated successfully!', 'success')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
+    return render_template('edit_grpo_item.html', grpo_doc=grpo_doc, grpo_item=grpo_item)
+
 @app.route('/inventory_transfer')
 @login_required
 def inventory_transfer():

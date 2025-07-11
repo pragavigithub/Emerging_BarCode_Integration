@@ -154,3 +154,12 @@ Changelog:
   - Fixed missing database models by importing models_extensions
   - Created default branch and admin user for initial setup
   - Application now runs successfully on Replit with proper database initialization
+- July 11, 2025. Enhanced SAP B1 Integration and GRPO Functionality:
+  - Implemented Purchase Delivery Note creation for closing POs in SAP B1
+  - Enhanced GRPO approval workflow with Purchase Delivery Note posting
+  - Added GRPO line item edit functionality for received quantities
+  - Created comprehensive edit interface for GRPO items with validation
+  - Configured PostgreSQL database for production deployment
+  - Fixed database storage issues and improved data persistence
+  - Added support for BaseType 22 (Purchase Order) reference in delivery notes
+  - Implemented proper warehouse code extraction from bin locations
