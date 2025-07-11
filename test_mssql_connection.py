@@ -12,10 +12,10 @@ def test_mssql_connection():
     """Test MSSQL connection with various configurations"""
     
     # Configuration
-    mssql_server = os.environ.get("MSSQL_SERVER", "DESKTOP-PLFK2B5\\SQLEXPRESS")
-    mssql_database = os.environ.get("MSSQL_DATABASE", "WMS_DB")
-    mssql_username = os.environ.get("MSSQL_USERNAME", "sa")
-    mssql_password = os.environ.get("MSSQL_PASSWORD", "Ea@12345")
+    mssql_server = os.environ.get("MSSQL_SERVER")
+    mssql_database = os.environ.get("MSSQL_DATABASE")
+    mssql_username = os.environ.get("MSSQL_USERNAME")
+    mssql_password = os.environ.get("MSSQL_PASSWORD")
     
     print(f"Testing connection to: {mssql_server}/{mssql_database}")
     print(f"Username: {mssql_username}")
