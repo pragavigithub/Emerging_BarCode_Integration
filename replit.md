@@ -170,3 +170,13 @@ Changelog:
   - Fixed database storage issues and improved data persistence
   - Added support for BaseType 22 (Purchase Order) reference in delivery notes
   - Implemented proper warehouse code extraction from bin locations
+- July 12, 2025. Comprehensive Issue Resolution:
+  - Fixed bin code retrieval to use 'Warehouse' field instead of 'WarehouseCode' for proper filtering
+  - Enhanced barcode generation with proper WMS format (WMS-ITEMCODE-RANDOMHEX)
+  - Implemented automatic barcode generation for GRPO line items
+  - Added duplicate prevention for PO line items (shows "Already Added" badge)
+  - Created warehouse selection interface for inventory transfers
+  - Fixed MSSQL integration issues with proper connection handling
+  - Enhanced inline editing functionality for received quantity, batch number, and expiration date
+  - Implemented real-time field updates without page refresh
+  - Added comprehensive error handling and user feedback

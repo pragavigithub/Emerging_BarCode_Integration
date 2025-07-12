@@ -454,7 +454,7 @@ class SAPIntegration:
         try:
             # Get bins for specific warehouse or all warehouses
             if warehouse_code:
-                url = f"{self.base_url}/b1s/v1/BinLocations?$filter=WarehouseCode eq '{warehouse_code}'"
+                url = f"{self.base_url}/b1s/v1/BinLocations?$filter=Warehouse eq '{warehouse_code}'"
             else:
                 url = f"{self.base_url}/b1s/v1/BinLocations"
                 
@@ -484,7 +484,7 @@ class SAPIntegration:
                 
                 for bin_data in bins:
                     bin_code = bin_data.get('BinCode')
-                    wh_code = bin_data.get('WarehouseCode')
+                    wh_code = bin_data.get('Warehouse')  # Use 'Warehouse' not 'WarehouseCode'
                     
                     if bin_code and wh_code:
                         # Upsert bin location

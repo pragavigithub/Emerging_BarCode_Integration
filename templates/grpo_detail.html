@@ -97,9 +97,14 @@
                                     <td>${{ "%.2f"|format(item.Price or item.price or 0) }}</td>
                                     <td>${{ "%.2f"|format((item.Quantity or item.quantity or 0) * (item.Price or item.price or 0)) }}</td>
                                     <td>
+                                        {% set item_already_received = grpo_doc.items|selectattr('po_line_number', 'equalto', item.LineNum)|selectattr('item_code', 'equalto', item.ItemCode or item.item_code)|list|length > 0 %}
+                                        {% if not item_already_received %}
                                         <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}')">
                                             <i data-feather="plus"></i> Add
                                         </button>
+                                        {% else %}
+                                        <span class="badge bg-info">Already Added</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -201,6 +206,10 @@
                                                 <i data-feather="printer"></i> Print
                                             </button>
                                             {% endif %}
+                                        {% elif grpo_doc.status in ['draft', 'rejected'] %}
+                                            <button class="btn btn-xs btn-success" onclick="generateBarcode({{ item.id }}, '{{ item.item_code }}')">
+                                                <i data-feather="plus"></i> Generate
+                                            </button>
                                         {% else %}
                                             {{ item.supplier_barcode or '-' }}
                                         {% endif %}
@@ -451,6 +460,49 @@ function removeItem(itemId) {
         // Implementation for removing item
         console.log('Remove item:', itemId);
     }
+}
+
+function generateBarcode(itemId, itemCode) {
+    // Generate barcode for the item
+    fetch('/api/generate_barcode', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            item_code: itemCode
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.barcode) {
+            // Update the item with the generated barcode
+            fetch(`/grpo/item/${itemId}/update_field`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    field_name: 'generated_barcode',
+                    field_value: data.barcode
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    location.reload(); // Refresh to show the generated barcode
+                } else {
+                    alert('Error updating barcode: ' + result.error);
+                }
+            });
+        } else {
+            alert('Error generating barcode: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error generating barcode');
+    });
 }
 
 function updateItemField(itemId, fieldName, fieldValue) {

@@ -195,8 +195,9 @@ def add_grpo_item(grpo_id):
     # Generate barcode if not provided
     generated_barcode = None
     if not request.form.get('supplier_barcode'):
-        import uuid
-        generated_barcode = f"WMS-{item_code}-{uuid.uuid4().hex[:8].upper()}"
+        import secrets
+        random_suffix = secrets.token_hex(4).upper()
+        generated_barcode = f"WMS-{item_code}-{random_suffix}"
     
     # Create GRPO item with enhanced details
     grpo_item = GRPOItem(
@@ -358,6 +359,8 @@ def update_grpo_item_field(item_id):
                 grpo_item.expiration_date = datetime.strptime(field_value, '%Y-%m-%d')
             else:
                 grpo_item.expiration_date = None
+        elif field_name == 'generated_barcode':
+            grpo_item.generated_barcode = field_value if field_value else None
         else:
             return jsonify({'success': False, 'error': 'Invalid field name'}), 400
         
@@ -580,8 +583,10 @@ def print_label():
     item_code = data['item_code']
     label_format = data.get('label_format', 'standard')
     
-    # Generate barcode and print label
-    barcode = f"ITM_{item_code}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    # Generate barcode with proper WMS format
+    import secrets
+    random_suffix = secrets.token_hex(4).upper()
+    barcode = f"WMS-{item_code}-{random_suffix}"
     
     # Save to database
     label = BarcodeLabel(
