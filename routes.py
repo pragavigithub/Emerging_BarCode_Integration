@@ -208,7 +208,7 @@ def add_grpo_item(grpo_id):
         po_quantity=po_line_item.get('Quantity') if po_line_item else quantity,
         open_quantity=po_line_item.get('OpenQuantity') if po_line_item else quantity,
         received_quantity=quantity,
-        unit_of_measure=request.form['unit_of_measure'],
+        unit_of_measure=po_line_item.get('UoMCode') or po_line_item.get('UoMEntry') or request.form.get('unit_of_measure', 'EA'),
         unit_price=po_line_item.get('Price') if po_line_item else 0,
         bin_location=bin_location,
         batch_number=batch_number,
@@ -903,16 +903,18 @@ def scan_barcode():
 @login_required
 def generate_barcode_api():
     """Generate new barcode for item"""
-    item_code = request.json.get('item_code')
-    batch_number = request.json.get('batch_number', '')
+    data = request.get_json()
+    item_code = data.get('item_code')
     
-    import uuid
-    barcode = f"WMS-{item_code}-{uuid.uuid4().hex[:8].upper()}"
+    if not item_code:
+        return jsonify({'error': 'Item code is required'}), 400
     
-    return jsonify({
-        'success': True,
-        'barcode': barcode
-    })
+    # Generate unique barcode with proper WMS format
+    import secrets
+    random_suffix = secrets.token_hex(4).upper()
+    barcode = f"WMS-{item_code}-{random_suffix}"
+    
+    return jsonify({'barcode': barcode})
 
 @app.route('/qc_dashboard')
 @login_required
@@ -931,28 +933,44 @@ def qc_dashboard():
     
     return render_template('qc_dashboard.html', pending_grpos=pending_grpos)
 
-@app.route('/api/get_bins_list')
+@app.route('/api/bins', methods=['GET'])
 @login_required
 def get_bins_api():
     """API endpoint to get available bins from SAP B1"""
-    warehouse_code = request.args.get('warehouse', 'WH01')
+    warehouse_code = request.args.get('warehouse_code')
     
-    # Get bins from SAP B1 if available
-    from sap_integration import SAPIntegration
-    sap_integration = SAPIntegration()
-    bins = sap_integration.get_available_bins(warehouse_code)
+    if not warehouse_code:
+        return jsonify({'error': 'warehouse_code parameter is required'}), 400
     
-    # If SAP is not available, return fallback bins
-    if not bins:
-        bins = [
+    try:
+        # Get bins from SAP B1 if available
+        from sap_integration import SAPIntegration
+        sap_integration = SAPIntegration()
+        bins = sap_integration.get_bins(warehouse_code)
+        
+        # If SAP is not available, return fallback bins
+        if not bins:
+            bins = [
+                {'BinCode': f'{warehouse_code}-A1-01', 'Description': 'Aisle A, Level 1, Position 1'},
+                {'BinCode': f'{warehouse_code}-A1-02', 'Description': 'Aisle A, Level 1, Position 2'},
+                {'BinCode': f'{warehouse_code}-A2-01', 'Description': 'Aisle A, Level 2, Position 1'},
+                {'BinCode': f'{warehouse_code}-B1-01', 'Description': 'Aisle B, Level 1, Position 1'},
+                {'BinCode': f'{warehouse_code}-B1-02', 'Description': 'Aisle B, Level 1, Position 2'},
+            ]
+        
+        return jsonify({'bins': bins})
+        
+    except Exception as e:
+        logging.error(f"Error fetching bins: {str(e)}")
+        # Return fallback bins for error cases
+        fallback_bins = [
             {'BinCode': f'{warehouse_code}-A1-01', 'Description': 'Aisle A, Level 1, Position 1'},
             {'BinCode': f'{warehouse_code}-A1-02', 'Description': 'Aisle A, Level 1, Position 2'},
             {'BinCode': f'{warehouse_code}-A2-01', 'Description': 'Aisle A, Level 2, Position 1'},
             {'BinCode': f'{warehouse_code}-B1-01', 'Description': 'Aisle B, Level 1, Position 1'},
             {'BinCode': f'{warehouse_code}-B1-02', 'Description': 'Aisle B, Level 1, Position 2'},
         ]
-    
-    return jsonify({'bins': bins})
+        return jsonify({'bins': fallback_bins})
 
 @app.route('/sync-sap-data', methods=['POST'])
 @login_required

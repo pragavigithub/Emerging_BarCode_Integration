@@ -93,7 +93,7 @@
                                     <td><strong>{{ item.ItemCode or item.item_code or 'N/A' }}</strong></td>
                                     <td>{{ item.ItemName or item.item_name or item.Description or 'N/A' }}</td>
                                     <td>{{ item.Quantity or item.quantity or 0 }}</td>
-                                    <td>{{ item.UnitOfMeasure or item.unit_of_measure or item.UoM or 'EA' }}</td>
+                                    <td>{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or 'EA' }}</td>
                                     <td>${{ "%.2f"|format(item.Price or item.price or 0) }}</td>
                                     <td>${{ "%.2f"|format((item.Quantity or item.quantity or 0) * (item.Price or item.price or 0)) }}</td>
                                     <td>
@@ -175,7 +175,7 @@
                                         <strong>{{ item.received_quantity }}</strong>
                                         {% endif %}
                                     </td>
-                                    <td>{{ item.unit_of_measure }}</td>
+                                    <td>{{ item.unit_of_measure or 'EA' }}</td>
                                     <td>{{ item.bin_location }}</td>
                                     <td>
                                         {% if grpo_doc.status in ['draft', 'rejected'] %}
@@ -211,7 +211,7 @@
                                                 <i data-feather="plus"></i> Generate
                                             </button>
                                         {% else %}
-                                            {{ item.supplier_barcode or '-' }}
+                                            {{ item.supplier_barcode or 'No barcode' }}
                                         {% endif %}
                                     </td>
                                     <td>
@@ -325,10 +325,7 @@
                         <label for="bin_location" class="form-label">Bin Location <span class="text-danger">*</span></label>
                         <select class="form-select" id="bin_location" name="bin_location" required>
                             <option value="">Select Bin Location</option>
-                            <option value="A-01-01">A-01-01</option>
-                            <option value="A-01-02">A-01-02</option>
-                            <option value="B-01-01">B-01-01</option>
-                            <option value="B-01-02">B-01-02</option>
+                            <!-- Bins will be loaded dynamically based on warehouse -->
                         </select>
                     </div>
                     <div class="row">
@@ -363,8 +360,53 @@
 {% block scripts %}
 <script>
 function showAddItemModal() {
+    // Load bins based on warehouse
+    loadBinsForWarehouse();
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
+}
+
+function loadBinsForWarehouse() {
+    // Extract warehouse from existing bin locations or use a default
+    const warehouseCode = 'WH001'; // This should be determined from the GRPO or user's branch
+    
+    fetch(`/api/bins?warehouse_code=${warehouseCode}`)
+        .then(response => response.json())
+        .then(data => {
+            const binSelect = document.getElementById('bin_location');
+            binSelect.innerHTML = '<option value="">Select Bin Location</option>';
+            
+            if (data.bins && data.bins.length > 0) {
+                data.bins.forEach(bin => {
+                    const option = document.createElement('option');
+                    option.value = bin.BinCode;
+                    option.textContent = bin.BinCode + (bin.Description ? ' - ' + bin.Description : '');
+                    binSelect.appendChild(option);
+                });
+            } else {
+                // Fallback bins if API fails
+                const fallbackBins = ['A-01-01', 'A-01-02', 'B-01-01', 'B-01-02'];
+                fallbackBins.forEach(binCode => {
+                    const option = document.createElement('option');
+                    option.value = binCode;
+                    option.textContent = binCode;
+                    binSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading bins:', error);
+            // Fallback bins if API fails
+            const binSelect = document.getElementById('bin_location');
+            binSelect.innerHTML = '<option value="">Select Bin Location</option>';
+            const fallbackBins = ['A-01-01', 'A-01-02', 'B-01-01', 'B-01-02'];
+            fallbackBins.forEach(binCode => {
+                const option = document.createElement('option');
+                option.value = binCode;
+                option.textContent = binCode;
+                binSelect.appendChild(option);
+            });
+        });
 }
 
 function addItemToGRPO(itemCode) {
