@@ -629,11 +629,16 @@ class SAPIntegration:
             }
             
             # Add batch information if available
-            if item.batch_number:
+            if item.batch_number and item.expiration_date:
                 line["BatchNumbers"] = [{
                     "BatchNumber": item.batch_number,
                     "Quantity": item.received_quantity,
-                    "ExpiryDate": item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else None
+                    "ExpiryDate": item.expiration_date.strftime('%Y-%m-%d')
+                }]
+            elif item.batch_number:
+                line["BatchNumbers"] = [{
+                    "BatchNumber": item.batch_number,
+                    "Quantity": item.received_quantity
                 }]
             
             document_lines.append(line)

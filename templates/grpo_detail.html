@@ -159,11 +159,40 @@
                                     <td>{{ item.item_name }}</td>
                                     <td>{{ item.po_quantity or '-' }}</td>
                                     <td>{{ item.open_quantity or '-' }}</td>
-                                    <td><strong>{{ item.received_quantity }}</strong></td>
+                                    <td>
+                                        {% if grpo_doc.status in ['draft', 'rejected'] %}
+                                        <input type="number" class="form-control form-control-sm" 
+                                               value="{{ item.received_quantity }}" 
+                                               min="0" step="0.01"
+                                               onchange="updateItemField({{ item.id }}, 'received_quantity', this.value)"
+                                               style="width: 80px;">
+                                        {% else %}
+                                        <strong>{{ item.received_quantity }}</strong>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ item.unit_of_measure }}</td>
                                     <td>{{ item.bin_location }}</td>
-                                    <td>{{ item.batch_number or '-' }}</td>
-                                    <td>{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '-' }}</td>
+                                    <td>
+                                        {% if grpo_doc.status in ['draft', 'rejected'] %}
+                                        <input type="text" class="form-control form-control-sm" 
+                                               value="{{ item.batch_number or '' }}" 
+                                               placeholder="Batch number"
+                                               onchange="updateItemField({{ item.id }}, 'batch_number', this.value)"
+                                               style="width: 120px;">
+                                        {% else %}
+                                        {{ item.batch_number or '-' }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if grpo_doc.status in ['draft', 'rejected'] %}
+                                        <input type="date" class="form-control form-control-sm" 
+                                               value="{{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '' }}" 
+                                               onchange="updateItemField({{ item.id }}, 'expiration_date', this.value)"
+                                               style="width: 140px;">
+                                        {% else %}
+                                        {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '-' }}
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if item.generated_barcode %}
                                             <span class="badge bg-success">{{ item.generated_barcode }}</span>
@@ -230,12 +259,18 @@
                             {% elif grpo_doc.status == 'submitted' and current_user.role in ['qc', 'manager', 'admin'] %}
                             <div class="btn-group">
                                 <button class="btn btn-success" onclick="approveGRPO({{ grpo_doc.id }})">
-                                    <i data-feather="check"></i> Approve
+                                    <i data-feather="check"></i> Approve & Post to SAP
                                 </button>
                                 <button class="btn btn-danger" onclick="rejectGRPO({{ grpo_doc.id }})">
                                     <i data-feather="x"></i> Reject
                                 </button>
                             </div>
+                            {% elif grpo_doc.status == 'approved' and current_user.role in ['admin', 'manager'] %}
+                            <form method="POST" action="{{ url_for('post_grpo_to_sap_manual', grpo_id=grpo_doc.id) }}" style="display: inline;">
+                                <button type="submit" class="btn btn-primary" onclick="return confirm('Post this GRPO to SAP B1 as Purchase Delivery Note?')">
+                                    <i data-feather="upload"></i> Post to SAP B1
+                                </button>
+                            </form>
                             {% endif %}
                         </div>
                     </div>
@@ -354,8 +389,11 @@ function submitGRPO(grpoId) {
 function approveGRPO(grpoId) {
     const notes = prompt('QC Notes (optional):');
     if (notes !== null) {
+        const draftOrPost = confirm('Click OK to POST to SAP B1 immediately, or Cancel to save as DRAFT for later posting');
+        
         const formData = new FormData();
         formData.append('qc_notes', notes);
+        formData.append('draft_or_post', draftOrPost ? 'post' : 'draft');
         
         fetch(`/grpo/${grpoId}/approve`, {
             method: 'POST',
@@ -413,6 +451,53 @@ function removeItem(itemId) {
         // Implementation for removing item
         console.log('Remove item:', itemId);
     }
+}
+
+function updateItemField(itemId, fieldName, fieldValue) {
+    // Show loading indicator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'position-fixed top-50 start-50 translate-middle bg-primary text-white p-3 rounded';
+    loadingDiv.innerHTML = '<i data-feather="loader" class="spinning"></i> Updating...';
+    document.body.appendChild(loadingDiv);
+    
+    fetch(`/grpo/item/${itemId}/update_field`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            field_name: fieldName,
+            field_value: fieldValue
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.body.removeChild(loadingDiv);
+        if (data.success) {
+            // Show success feedback
+            const successDiv = document.createElement('div');
+            successDiv.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+            successDiv.innerHTML = '<i data-feather="check"></i> Updated successfully';
+            document.body.appendChild(successDiv);
+            
+            // Remove success message after 2 seconds
+            setTimeout(() => {
+                if (document.body.contains(successDiv)) {
+                    document.body.removeChild(successDiv);
+                }
+            }, 2000);
+            
+            // Refresh feather icons
+            feather.replace();
+        } else {
+            alert('Error updating field: ' + data.error);
+        }
+    })
+    .catch(error => {
+        document.body.removeChild(loadingDiv);
+        console.error('Error:', error);
+        alert('Error updating field: ' + error);
+    });
 }
 </script>
 {% endblock %}

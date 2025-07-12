@@ -330,6 +330,45 @@ def edit_grpo_item(grpo_id, item_id):
     
     return render_template('edit_grpo_item.html', grpo_doc=grpo_doc, grpo_item=grpo_item)
 
+@app.route('/grpo/item/<int:item_id>/update_field', methods=['POST'])
+@login_required
+def update_grpo_item_field(item_id):
+    """Update a single field of a GRPO item via AJAX"""
+    grpo_item = GRPOItem.query.get_or_404(item_id)
+    grpo_doc = grpo_item.grpo_document
+    
+    # Check permissions
+    if grpo_doc.user_id != current_user.id and current_user.role not in ['manager', 'admin']:
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    # Check if editable
+    if grpo_doc.status not in ['draft', 'rejected']:
+        return jsonify({'success': False, 'error': 'Cannot edit approved or posted GRPO'}), 400
+    
+    try:
+        field_name = request.json.get('field_name')
+        field_value = request.json.get('field_value')
+        
+        if field_name == 'received_quantity':
+            grpo_item.received_quantity = float(field_value) if field_value else 0
+        elif field_name == 'batch_number':
+            grpo_item.batch_number = field_value if field_value else None
+        elif field_name == 'expiration_date':
+            if field_value:
+                grpo_item.expiration_date = datetime.strptime(field_value, '%Y-%m-%d')
+            else:
+                grpo_item.expiration_date = None
+        else:
+            return jsonify({'success': False, 'error': 'Invalid field name'}), 400
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Field updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error updating GRPO item field: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/inventory_transfer')
 @login_required
 def inventory_transfer():
