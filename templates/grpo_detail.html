@@ -97,13 +97,21 @@
                                     <td>${{ "%.2f"|format(item.Price or item.price or 0) }}</td>
                                     <td>${{ "%.2f"|format((item.Quantity or item.quantity or 0) * (item.Price or item.price or 0)) }}</td>
                                     <td>
-                                        {% set item_already_received = grpo_doc.items|selectattr('po_line_number', 'equalto', item.LineNum)|selectattr('item_code', 'equalto', item.ItemCode or item.item_code)|list|length > 0 %}
-                                        {% if not item_already_received %}
+                                        {% set received_items = grpo_doc.items|selectattr('po_line_number', 'equalto', item.LineNum)|selectattr('item_code', 'equalto', item.ItemCode or item.item_code)|list %}
+                                        {% set total_received = received_items|sum(attribute='received_quantity') %}
+                                        {% set po_quantity = item.Quantity or item.quantity or 0 %}
+                                        {% set open_quantity = item.OpenQuantity or item.open_quantity or 0 %}
+                                        {% set is_fully_received = (total_received >= po_quantity) or (open_quantity <= 0) %}
+                                        
+                                        {% if not is_fully_received %}
                                         <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}')">
                                             <i data-feather="plus"></i> Add
                                         </button>
+                                        {% if received_items|length > 0 %}
+                                        <br><small class="text-muted">{{ total_received }}/{{ po_quantity }} received</small>
+                                        {% endif %}
                                         {% else %}
-                                        <span class="badge bg-info">Already Added</span>
+                                        <span class="badge bg-success">Fully Received</span>
                                         {% endif %}
                                     </td>
                                 </tr>

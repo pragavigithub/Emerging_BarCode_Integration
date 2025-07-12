@@ -174,9 +174,10 @@ Changelog:
   - Fixed bin code retrieval to use 'Warehouse' field instead of 'WarehouseCode' for proper filtering
   - Enhanced barcode generation with proper WMS format (WMS-ITEMCODE-RANDOMHEX)
   - Implemented automatic barcode generation for GRPO line items
-  - Added duplicate prevention for PO line items (shows "Already Added" badge)
+  - Added smart duplicate prevention for PO line items (shows "Fully Received" only when complete quantity received)
   - Created warehouse selection interface for inventory transfers
   - Fixed MSSQL integration issues with proper connection handling
   - Enhanced inline editing functionality for received quantity, batch number, and expiration date
   - Implemented real-time field updates without page refresh
   - Added comprehensive error handling and user feedback
+  - Fixed partial receipt logic to allow multiple receipts until PO line is fully received
