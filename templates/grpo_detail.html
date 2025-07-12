@@ -101,14 +101,14 @@
                                         {% set total_received = received_items|sum(attribute='received_quantity') %}
                                         {% set po_quantity = item.Quantity or item.quantity or 0 %}
                                         {% set open_quantity = item.OpenQuantity or item.open_quantity or 0 %}
-                                        {% set is_fully_received = (total_received >= po_quantity) or (open_quantity <= 0) %}
+                                        {% set is_fully_received = (total_received >= open_quantity) and (open_quantity > 0) %}
                                         
                                         {% if not is_fully_received %}
                                         <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}')">
                                             <i data-feather="plus"></i> Add
                                         </button>
                                         {% if received_items|length > 0 %}
-                                        <br><small class="text-muted">{{ total_received }}/{{ po_quantity }} received</small>
+                                        <br><small class="text-muted">{{ total_received }}/{{ open_quantity }} received ({{ open_quantity }} remaining)</small>
                                         {% endif %}
                                         {% else %}
                                         <span class="badge bg-success">Fully Received</span>

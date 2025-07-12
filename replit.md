@@ -181,3 +181,12 @@ Changelog:
   - Implemented real-time field updates without page refresh
   - Added comprehensive error handling and user feedback
   - Fixed partial receipt logic to allow multiple receipts until PO line is fully received
+- July 12, 2025. Migration to Replit Environment Complete:
+  - Successfully migrated from Replit Agent to Replit environment
+  - Fixed GRPO fully received logic: Now correctly checks received quantity against open quantity
+  - Enhanced Purchase Delivery Note creation with proper SAP B1 field mapping
+  - Improved QC approval workflow to only include approved items in Purchase Delivery Notes
+  - Added comprehensive error handling and logging for SAP B1 integration
+  - Implemented proper BaseType 22 (Purchase Order) referencing in delivery notes
+  - Enhanced batch and bin location mapping for inventory accuracy
+  - Added proper reference fields (GRPO ID, PO number) for audit trail

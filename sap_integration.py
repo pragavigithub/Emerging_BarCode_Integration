@@ -681,7 +681,7 @@ class SAPIntegration:
             return False
     
     def create_purchase_delivery_note(self, grpo_document):
-        """Create Purchase Delivery Note in SAP B1 to close PO"""
+        """Create Purchase Delivery Note in SAP B1 to close PO after QC Approval"""
         if not self.ensure_logged_in():
             # Return success for offline mode
             import random
@@ -691,59 +691,85 @@ class SAPIntegration:
                 'document_number': f'PDN-{random.randint(100000, 999999)}'
             }
             
-        # Get PO data first
+        # Get PO data first to ensure proper field mapping
         po_data = self.get_purchase_order(grpo_document.po_number)
         if not po_data:
-            return {'success': False, 'error': f'Purchase Order {grpo_document.po_number} not found'}
+            return {'success': False, 'error': f'Purchase Order {grpo_document.po_number} not found in SAP B1'}
         
         supplier_code = po_data.get('CardCode')
         po_doc_entry = po_data.get('DocEntry')
         
         if not supplier_code or not po_doc_entry:
-            return {'success': False, 'error': 'Missing supplier code or PO DocEntry'}
+            return {'success': False, 'error': 'Missing supplier code or PO DocEntry from SAP B1'}
         
-        # Build document lines with PO base reference
+        # Build document lines with proper PO base reference
         document_lines = []
         for item in grpo_document.items:
-            # Find matching PO line
+            # Only include QC approved items
+            if item.qc_status != 'approved':
+                continue
+                
+            # Find matching PO line for proper mapping
             po_line_num = None
+            po_line_data = None
             for po_line in po_data.get('DocumentLines', []):
                 if po_line.get('ItemCode') == item.item_code:
                     po_line_num = po_line.get('LineNum')
+                    po_line_data = po_line
                     break
             
             if po_line_num is None:
+                logging.warning(f"PO line not found for item {item.item_code} in PO {grpo_document.po_number}")
                 continue  # Skip items not found in PO
             
+            # Extract warehouse code from bin location (first 4 characters or default)
+            warehouse_code = item.bin_location[:4] if len(item.bin_location) >= 4 else "2002"
+            
+            # Build line with proper SAP B1 field mapping
             line = {
-                "BaseType": 22,  # Purchase Order
+                "BaseType": 22,  # Purchase Order base type
                 "BaseEntry": po_doc_entry,
                 "BaseLine": po_line_num,
+                "ItemCode": item.item_code,
+                "ItemDescription": item.item_name,
                 "Quantity": item.received_quantity,
-                "WarehouseCode": item.bin_location[:4] if len(item.bin_location) > 4 else "2002"  # Extract warehouse from bin
+                "Price": po_line_data.get('Price', 0) if po_line_data else 0,
+                "WarehouseCode": warehouse_code,
+                "UoMCode": item.unit_of_measure or po_line_data.get('UoMCode', 'EA') if po_line_data else 'EA'
             }
             
             # Add batch information if available
-            if item.batch_number and item.expiration_date:
-                line["BatchNumbers"] = [{
+            if item.batch_number:
+                batch_info = {
                     "BatchNumber": item.batch_number,
-                    "Quantity": item.received_quantity,
-                    "ExpiryDate": item.expiration_date.strftime('%Y-%m-%d')
-                }]
-            elif item.batch_number:
-                line["BatchNumbers"] = [{
-                    "BatchNumber": item.batch_number,
+                    "Quantity": item.received_quantity
+                }
+                if item.expiration_date:
+                    batch_info["ExpiryDate"] = item.expiration_date.strftime('%Y-%m-%d')
+                line["BatchNumbers"] = [batch_info]
+            
+            # Add bin location information
+            if item.bin_location:
+                line["BinAllocations"] = [{
+                    "BinAbsEntry": 0,  # SAP will resolve this
+                    "BinCode": item.bin_location,
                     "Quantity": item.received_quantity
                 }]
             
             document_lines.append(line)
         
-        # Create Purchase Delivery Note payload
+        if not document_lines:
+            return {'success': False, 'error': 'No approved items found for Purchase Delivery Note creation'}
+        
+        # Create Purchase Delivery Note payload with all required fields
         pdn_data = {
             "CardCode": supplier_code,
-            "DocDate": datetime.now().strftime('%Y-%m-%d'),
-            "DocDueDate": datetime.now().strftime('%Y-%m-%d'),
-            "Comments": f"Closing PO {grpo_document.po_number} via Delivery Note - WMS GRPO {grpo_document.id}",
+            "DocDate": grpo_document.created_at.strftime('%Y-%m-%d'),
+            "DocDueDate": grpo_document.created_at.strftime('%Y-%m-%d'),
+            "TaxDate": grpo_document.created_at.strftime('%Y-%m-%d'),
+            "Comments": f"WMS GRPO {grpo_document.id} - Closing PO {grpo_document.po_number} after QC Approval by {grpo_document.qc_user.username if grpo_document.qc_user else 'System'}",
+            "Reference1": f"GRPO-{grpo_document.id}",
+            "Reference2": f"PO-{grpo_document.po_number}",
             "DocumentLines": document_lines
         }
         
@@ -753,19 +779,21 @@ class SAPIntegration:
             response = self.session.post(url, json=pdn_data)
             if response.status_code == 201:
                 result = response.json()
+                logging.info(f"Successfully created Purchase Delivery Note {result.get('DocNum')} for GRPO {grpo_document.id}")
                 return {
                     'success': True,
                     'document_number': result.get('DocNum'),
-                    'doc_entry': result.get('DocEntry')
+                    'doc_entry': result.get('DocEntry'),
+                    'message': f'Purchase Delivery Note {result.get("DocNum")} created successfully'
                 }
             else:
-                return {
-                    'success': False,
-                    'error': f"SAP B1 error: {response.text}"
-                }
+                error_msg = f"SAP B1 error creating Purchase Delivery Note: {response.text}"
+                logging.error(error_msg)
+                return {'success': False, 'error': error_msg}
         except Exception as e:
-            logging.error(f"Error creating Purchase Delivery Note in SAP B1: {str(e)}")
-            return {'success': False, 'error': str(e)}
+            error_msg = f"Error creating Purchase Delivery Note in SAP B1: {str(e)}"
+            logging.error(error_msg)
+            return {'success': False, 'error': error_msg}
 
     def post_grpo_to_sap(self, grpo_document):
         """Post approved GRPO to SAP B1 as Purchase Delivery Note"""
