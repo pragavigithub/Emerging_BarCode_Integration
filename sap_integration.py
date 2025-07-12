@@ -57,6 +57,56 @@ class SAPIntegration:
             return self.login()
         return True
     
+    def get_inventory_transfer_request(self, doc_num):
+        """Get specific inventory transfer request from SAP B1"""
+        if not self.ensure_logged_in():
+            return None
+        
+        try:
+            url = f"{self.base_url}/b1s/v1/InventoryTransferRequests?$filter=DocNum eq {doc_num}"
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                transfers = data.get('value', [])
+                if transfers:
+                    return transfers[0]
+            return None
+        except Exception as e:
+            logging.error(f"Error getting inventory transfer request: {str(e)}")
+            return None
+    
+    def get_bins(self, warehouse_code):
+        """Get bins for a specific warehouse"""
+        if not self.ensure_logged_in():
+            return []
+        
+        try:
+            url = f"{self.base_url}/b1s/v1/BinLocations?$filter=Warehouse eq '{warehouse_code}'"
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                bins = data.get('value', [])
+                
+                # Transform the data to match our expected format
+                formatted_bins = []
+                for bin_data in bins:
+                    formatted_bins.append({
+                        'BinCode': bin_data.get('BinCode'),
+                        'Description': bin_data.get('Description', ''),
+                        'Warehouse': bin_data.get('Warehouse'),
+                        'Active': bin_data.get('Active', 'Y')
+                    })
+                
+                return formatted_bins
+            else:
+                logging.error(f"Failed to get bins: {response.status_code}")
+                return []
+        except Exception as e:
+            logging.error(f"Error getting bins: {str(e)}")
+            return []
+    
     def get_purchase_order(self, po_number):
         """Get purchase order details from SAP B1"""
         if not self.ensure_logged_in():
@@ -403,26 +453,52 @@ class SAPIntegration:
                     ).fetchone()
                     
                     if not existing:
-                        # Insert new warehouse as branch
-                        db.session.execute(db.text("""
-                            INSERT INTO branches (id, name, address, is_active, created_at, updated_at)
-                            VALUES (:id, :name, :address, :is_active, NOW(), NOW())
-                        """), {
+                        # Insert new warehouse as branch - use compatible SQL
+                        import os
+                        is_postgresql = 'postgresql' in os.environ.get('DATABASE_URL', '').lower()
+                        
+                        if is_postgresql:
+                            insert_sql = """
+                                INSERT INTO branches (id, name, address, is_active, created_at, updated_at)
+                                VALUES (:id, :name, :address, :is_active, NOW(), NOW())
+                            """
+                        else:
+                            insert_sql = """
+                                INSERT INTO branches (id, name, address, is_active, created_at, updated_at)
+                                VALUES (:id, :name, :address, :is_active, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            """
+                        
+                        db.session.execute(db.text(insert_sql), {
                             "id": wh.get('WarehouseCode'),
                             "name": wh.get('WarehouseName', ''),
                             "address": wh.get('Street', ''),
                             "is_active": wh.get('Inactive') != 'Y'
                         })
                     else:
-                        # Update existing warehouse
-                        db.session.execute(db.text("""
-                            UPDATE branches SET 
-                                name = :name, 
-                                address = :address, 
-                                is_active = :is_active,
-                                updated_at = NOW()
-                            WHERE id = :id
-                        """), {
+                        # Update existing warehouse - use compatible SQL
+                        import os
+                        is_postgresql = 'postgresql' in os.environ.get('DATABASE_URL', '').lower()
+                        
+                        if is_postgresql:
+                            update_sql = """
+                                UPDATE branches SET 
+                                    name = :name, 
+                                    address = :address, 
+                                    is_active = :is_active,
+                                    updated_at = NOW()
+                                WHERE id = :id
+                            """
+                        else:
+                            update_sql = """
+                                UPDATE branches SET 
+                                    name = :name, 
+                                    address = :address, 
+                                    is_active = :is_active,
+                                    updated_at = CURRENT_TIMESTAMP
+                                WHERE id = :id
+                            """
+                        
+                        db.session.execute(db.text(update_sql), {
                             "id": wh.get('WarehouseCode'),
                             "name": wh.get('WarehouseName', ''),
                             "address": wh.get('Street', ''),
@@ -463,21 +539,40 @@ class SAPIntegration:
             if response.status_code == 200:
                 bins = response.json().get('value', [])
                 
-                # Create bins table if not exists
+                # Create bins table if not exists - use compatible SQL
                 from app import db
+                import os
                 
-                db.session.execute(db.text("""
-                    CREATE TABLE IF NOT EXISTS bin_locations (
-                        id SERIAL PRIMARY KEY,
-                        bin_code VARCHAR(50) NOT NULL,
-                        warehouse_code VARCHAR(10) NOT NULL,
-                        bin_name VARCHAR(100),
-                        is_active BOOLEAN DEFAULT TRUE,
-                        created_at TIMESTAMP DEFAULT NOW(),
-                        updated_at TIMESTAMP DEFAULT NOW(),
-                        UNIQUE(bin_code, warehouse_code)
-                    )
-                """))
+                is_postgresql = 'postgresql' in os.environ.get('DATABASE_URL', '').lower()
+                
+                if is_postgresql:
+                    create_table_sql = """
+                        CREATE TABLE IF NOT EXISTS bin_locations (
+                            id SERIAL PRIMARY KEY,
+                            bin_code VARCHAR(50) NOT NULL,
+                            warehouse_code VARCHAR(10) NOT NULL,
+                            bin_name VARCHAR(100),
+                            is_active BOOLEAN DEFAULT TRUE,
+                            created_at TIMESTAMP DEFAULT NOW(),
+                            updated_at TIMESTAMP DEFAULT NOW(),
+                            UNIQUE(bin_code, warehouse_code)
+                        )
+                    """
+                else:
+                    create_table_sql = """
+                        CREATE TABLE IF NOT EXISTS bin_locations (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            bin_code VARCHAR(50) NOT NULL,
+                            warehouse_code VARCHAR(10) NOT NULL,
+                            bin_name VARCHAR(100),
+                            is_active BOOLEAN DEFAULT 1,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(bin_code, warehouse_code)
+                        )
+                    """
+                
+                db.session.execute(db.text(create_table_sql))
                 
                 # Clear cache
                 self._bin_cache = {}

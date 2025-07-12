@@ -933,6 +933,32 @@ def qc_dashboard():
     
     return render_template('qc_dashboard.html', pending_grpos=pending_grpos)
 
+@app.route('/api/validate_transfer_request', methods=['POST'])
+@login_required
+def validate_transfer_request():
+    """Validate transfer request number from SAP B1"""
+    data = request.get_json()
+    transfer_request = data.get('transfer_request')
+    
+    if not transfer_request:
+        return jsonify({'valid': False, 'error': 'Transfer request number is required'})
+    
+    try:
+        # Check SAP B1 for the transfer request
+        sap = SAPIntegration()
+        transfer_data = sap.get_inventory_transfer_request(transfer_request)
+        
+        if transfer_data:
+            return jsonify({
+                'valid': True,
+                'transfer_data': transfer_data
+            })
+        else:
+            return jsonify({'valid': False, 'error': 'Transfer request not found in SAP B1'})
+    except Exception as e:
+        logging.error(f"Error validating transfer request: {str(e)}")
+        return jsonify({'valid': False, 'error': 'Error validating transfer request'})
+
 @app.route('/api/bins', methods=['GET'])
 @login_required
 def get_bins_api():
