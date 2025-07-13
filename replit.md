@@ -218,3 +218,12 @@ Changelog:
   - Enhanced MSSQL connection handling with multiple driver fallbacks
   - Added support for SQL Server Management Studio 20.2.30.0 environment
   - Improved connection timeout and error handling for local development
+- July 13, 2025. Complete MySQL Database Integration:
+  - Added MySQL as primary database option for local development
+  - Installed PyMySQL and MySQL Connector drivers with proper fallback mechanisms
+  - Enhanced database detection logic to handle MySQL-specific SQL syntax
+  - Fixed database-specific queries (NOW() vs CURRENT_TIMESTAMP, ON DUPLICATE KEY UPDATE vs ON CONFLICT)
+  - Created comprehensive MySQL setup scripts (setup_mysql_env.py, install_mysql_local.py)
+  - Updated database connection priority: MySQL → MSSQL → PostgreSQL → SQLite
+  - Resolved PO line status validation issue by enhancing database compatibility
+  - Added MySQL-specific table creation and upsert syntax for bin locations and warehouses
