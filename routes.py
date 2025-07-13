@@ -216,7 +216,7 @@ def add_grpo_item(grpo_id):
     
     item_code = request.form['item_code']
     quantity = float(request.form['quantity'])
-    bin_location = request.form['bin_location']
+    warehouse_code = request.form['warehouse_code']
     batch_number = request.form.get('batch_number')
     
     # Get PO line item details if available
@@ -248,7 +248,7 @@ def add_grpo_item(grpo_id):
         received_quantity=quantity,
         unit_of_measure=po_line_item.get('UoMCode') or po_line_item.get('UoMEntry') or request.form.get('unit_of_measure', 'EA'),
         unit_price=po_line_item.get('Price') if po_line_item else 0,
-        bin_location=bin_location,
+        bin_location=warehouse_code,  # Store warehouse code in bin_location field
         batch_number=batch_number,
         expiration_date=datetime.strptime(request.form['expiration_date'], '%Y-%m-%d') if request.form.get('expiration_date') else None,
         supplier_barcode=request.form.get('supplier_barcode'),
@@ -1185,3 +1185,108 @@ def sync_sap_data():
 # Duplicate route removed - using the one defined earlier
 
 # Default admin user is created in app.py during initialization
+
+@app.route('/api/grpo/<int:grpo_id>/preview_json')
+@login_required
+def preview_grpo_json(grpo_id):
+    """Preview the JSON that will be posted to SAP B1"""
+    try:
+        grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+        
+        # Generate the same JSON that would be posted to SAP B1
+        sap = SAPIntegration()
+        
+        # Get PO data
+        po_data = sap.get_purchase_order(grpo_doc.po_number)
+        if not po_data:
+            return jsonify({'success': False, 'error': 'PO data not found'})
+        
+        # Build the Purchase Delivery Note JSON structure
+        from datetime import datetime
+        doc_date = datetime.utcnow().strftime('%Y-%m-%d')
+        doc_due_date = doc_date
+        
+        card_code = po_data.get('CardCode')
+        po_doc_entry = po_data.get('DocEntry')
+        
+        # Generate external reference
+        external_ref = sap.generate_external_reference_number(grpo_doc)
+        
+        # Get BusinessPlaceID
+        first_warehouse_code = None
+        if grpo_doc.items:
+            for item in grpo_doc.items:
+                if item.qc_status == 'approved' and item.bin_location:
+                    first_warehouse_code = item.bin_location.split('-')[0] if '-' in item.bin_location else item.bin_location[:4]
+                    break
+        
+        business_place_id = sap.get_warehouse_business_place_id(first_warehouse_code) if first_warehouse_code else 5
+        
+        # Build document lines
+        document_lines = []
+        line_number = 0
+        
+        for item in grpo_doc.items:
+            if item.qc_status != 'approved':
+                continue
+                
+            # Find matching PO line
+            po_line_num = None
+            for po_line in po_data.get('DocumentLines', []):
+                if po_line.get('ItemCode') == item.item_code:
+                    po_line_num = po_line.get('LineNum')
+                    break
+            
+            if po_line_num is None:
+                continue
+            
+            # Extract warehouse code from stored location
+            warehouse_code = item.bin_location.split('-')[0] if '-' in item.bin_location else item.bin_location[:4]
+            
+            # Build line
+            line = {
+                "BaseType": 22,
+                "BaseEntry": po_doc_entry,
+                "BaseLine": po_line_num,
+                "ItemCode": item.item_code,
+                "Quantity": item.received_quantity,
+                "WarehouseCode": warehouse_code
+            }
+            
+            # Add batch information if available
+            if item.batch_number:
+                batch_info = {
+                    "BatchNumber": item.batch_number,
+                    "Quantity": item.received_quantity,
+                    "BaseLineNumber": line_number,
+                    "ManufacturerSerialNumber": getattr(item, 'manufacturer_serial', None) or "MFG-SN-001",
+                    "InternalSerialNumber": getattr(item, 'internal_serial', None) or "INT-SN-001",
+                    "ExpiryDate": item.expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ') if item.expiration_date else doc_date + "T00:00:00Z"
+                }
+                line["BatchNumbers"] = [batch_info]
+            
+            document_lines.append(line)
+            line_number += 1
+        
+        # Build complete JSON structure
+        pdn_data = {
+            "CardCode": card_code,
+            "DocDate": doc_date,
+            "DocDueDate": doc_due_date,
+            "Comments": grpo_doc.notes or "Auto-created from PO after QC",
+            "NumAtCard": external_ref,
+            "BPL_IDAssignedToInvoice": business_place_id,
+            "DocumentLines": document_lines
+        }
+        
+        return jsonify({
+            'success': True,
+            'json_data': pdn_data,
+            'grpo_id': grpo_id,
+            'po_number': grpo_doc.po_number,
+            'total_lines': len(document_lines)
+        })
+        
+    except Exception as e:
+        logging.error(f"Error generating JSON preview: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})

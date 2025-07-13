@@ -168,7 +168,7 @@
                                     <th>Open Qty</th>
                                     <th>Received Qty</th>
                                     <th>UoM</th>
-                                    <th>Bin Location</th>
+                                    <th>Warehouse</th>
                                     <th>Batch</th>
                                     <th>Expiry</th>
                                     <th>Barcode</th>
@@ -198,7 +198,7 @@
                                     <td>
                                         {% set warehouse_code = item.bin_location.split('-')[0] if item.bin_location and '-' in item.bin_location else item.bin_location[:4] if item.bin_location else 'N/A' %}
                                         <strong>{{ warehouse_code }}</strong>
-                                        <br><small class="text-muted">{{ item.bin_location }}</small>
+                                        <br><small class="text-muted">Warehouse: {{ item.bin_location }}</small>
                                     </td>
                                     <td>
                                         {% if grpo_doc.status in ['draft', 'rejected'] %}
@@ -298,11 +298,16 @@
                                 </button>
                             </div>
                             {% elif grpo_doc.status == 'approved' and current_user.role in ['admin', 'manager'] %}
-                            <form method="POST" action="{{ url_for('post_grpo_to_sap_manual', grpo_id=grpo_doc.id) }}" style="display: inline;">
-                                <button type="submit" class="btn btn-primary" onclick="return confirm('Post this GRPO to SAP B1 as Purchase Delivery Note?')">
-                                    <i data-feather="upload"></i> Post to SAP B1
+                            <div class="btn-group">
+                                <form method="POST" action="{{ url_for('post_grpo_to_sap_manual', grpo_id=grpo_doc.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-primary" onclick="return confirm('Post this GRPO to SAP B1 as Purchase Delivery Note?')">
+                                        <i data-feather="upload"></i> Post to SAP B1
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-info" onclick="showJsonPreview({{ grpo_doc.id }})">
+                                    <i data-feather="eye"></i> Preview JSON
                                 </button>
-                            </form>
+                            </div>
                             {% endif %}
                         </div>
                     </div>
@@ -345,11 +350,10 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="bin_location" class="form-label">Bin Location <span class="text-danger">*</span></label>
-                        <select class="form-select" id="bin_location" name="bin_location" required>
-                            <option value="">Select Bin Location</option>
-                            <!-- Bins will be loaded dynamically based on warehouse -->
-                        </select>
+                        <label for="warehouse_code" class="form-label">Warehouse Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="warehouse_code" name="warehouse_code" 
+                               value="WH001" placeholder="Enter warehouse code (e.g., WH001)" required>
+                        <div class="form-text">Enter the warehouse code where items will be stored</div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
@@ -380,56 +384,70 @@
 </div>
 {% endblock %}
 
+<!-- JSON Preview Modal -->
+<div class="modal fade" id="jsonPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">SAP B1 JSON Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6>Purchase Delivery Note JSON Structure:</h6>
+                    <div class="form-text">This is the exact JSON that will be posted to SAP B1</div>
+                </div>
+                <pre id="jsonContent" class="bg-light p-3" style="border-radius: 5px; font-size: 12px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="copyJsonToClipboard()">
+                    <i data-feather="copy"></i> Copy JSON
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
 <script>
 function showAddItemModal() {
-    // Load bins based on warehouse
-    loadBinsForWarehouse();
+    // No need to load bins, using warehouse code instead
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
 }
 
-function loadBinsForWarehouse() {
-    // Extract warehouse from existing bin locations or use a default
-    const warehouseCode = 'WH001'; // This should be determined from the GRPO or user's branch
-    
-    fetch(`/api/bins?warehouse_code=${warehouseCode}`)
+// Show JSON Preview for SAP B1 posting
+function showJsonPreview(grpoId) {
+    fetch(`/api/grpo/${grpoId}/preview_json`)
         .then(response => response.json())
         .then(data => {
-            const binSelect = document.getElementById('bin_location');
-            binSelect.innerHTML = '<option value="">Select Bin Location</option>';
-            
-            if (data.bins && data.bins.length > 0) {
-                data.bins.forEach(bin => {
-                    const option = document.createElement('option');
-                    option.value = bin.BinCode;
-                    option.textContent = bin.BinCode + (bin.Description ? ' - ' + bin.Description : '');
-                    binSelect.appendChild(option);
-                });
+            const jsonContent = document.getElementById('jsonContent');
+            if (data.success) {
+                jsonContent.textContent = JSON.stringify(data.json_data, null, 2);
             } else {
-                // Fallback bins if API fails
-                const fallbackBins = ['A-01-01', 'A-01-02', 'B-01-01', 'B-01-02'];
-                fallbackBins.forEach(binCode => {
-                    const option = document.createElement('option');
-                    option.value = binCode;
-                    option.textContent = binCode;
-                    binSelect.appendChild(option);
-                });
+                jsonContent.textContent = `Error generating JSON preview: ${data.error}`;
             }
+            const modal = new bootstrap.Modal(document.getElementById('jsonPreviewModal'));
+            modal.show();
         })
         .catch(error => {
-            console.error('Error loading bins:', error);
-            // Fallback bins if API fails
-            const binSelect = document.getElementById('bin_location');
-            binSelect.innerHTML = '<option value="">Select Bin Location</option>';
-            const fallbackBins = ['A-01-01', 'A-01-02', 'B-01-01', 'B-01-02'];
-            fallbackBins.forEach(binCode => {
-                const option = document.createElement('option');
-                option.value = binCode;
-                option.textContent = binCode;
-                binSelect.appendChild(option);
-            });
+            console.error('Error fetching JSON preview:', error);
+            const jsonContent = document.getElementById('jsonContent');
+            jsonContent.textContent = `Error fetching JSON preview: ${error.message}`;
+            const modal = new bootstrap.Modal(document.getElementById('jsonPreviewModal'));
+            modal.show();
         });
+}
+
+function copyJsonToClipboard() {
+    const jsonContent = document.getElementById('jsonContent').textContent;
+    navigator.clipboard.writeText(jsonContent).then(() => {
+        alert('JSON copied to clipboard!');
+    }).catch(err => {
+        console.error('Could not copy text: ', err);
+        alert('Failed to copy JSON to clipboard');
+    });
 }
 
 function addItemToGRPO(itemCode) {

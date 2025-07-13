@@ -246,3 +246,10 @@ Changelog:
   - Fixed warehouse code display issues in GRPO screens
   - Resolved duplicate route definitions and application startup errors
   - Enhanced WMS barcode format: WMS-ITEMCODE-RANDOMHEX with proper database tracking
+- July 13, 2025. UI/UX Enhancement and JSON Debugging Features:
+  - Replaced bin location dropdown with warehouse code input field for simplified data entry
+  - Added "Preview JSON" button to show exact Purchase Delivery Note structure before SAP B1 posting
+  - Implemented JSON preview modal with copy-to-clipboard functionality for debugging
+  - Enhanced warehouse code display in GRPO item listings for better visibility
+  - Updated add item form to use warehouse code instead of complex bin location selection
+  - Created comprehensive JSON preview API endpoint for real-time SAP B1 payload inspection
