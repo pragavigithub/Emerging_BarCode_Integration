@@ -227,3 +227,13 @@ Changelog:
   - Updated database connection priority: MySQL → MSSQL → PostgreSQL → SQLite
   - Resolved PO line status validation issue by enhancing database compatibility
   - Added MySQL-specific table creation and upsert syntax for bin locations and warehouses
+- July 13, 2025. Enhanced Purchase Delivery Note Integration with Exact SAP B1 Specifications:
+  - Implemented comprehensive Purchase Delivery Note creation with exact JSON structure
+  - Added automatic external reference number generation (EXT-REF-YYYYMMDD-XXX format)
+  - Created BusinessPlaceID lookup functionality from warehouse codes via SAP B1 API
+  - Enhanced batch number mapping with complete field structure (ManufacturerSerialNumber, InternalSerialNumber, ExpiryDate)
+  - Added proper BaseType 22 (Purchase Order) referencing with BaseEntry and BaseLine mapping
+  - Implemented sequence table for unique reference number generation per day
+  - Enhanced error handling and logging for Purchase Delivery Note creation process
+  - Added comprehensive field mapping: CardCode, DocDate, DocDueDate, Comments, NumAtCard, BPL_IDAssignedToInvoice
+  - Created complete document line structure with proper quantity and warehouse code extraction
