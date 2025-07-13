@@ -32,28 +32,75 @@ mssql_password = os.environ.get("MSSQL_PASSWORD")
 database_url = os.environ.get("DATABASE_URL")
 
 if mssql_server and mssql_database and mssql_username and mssql_password:
-    # MSSQL Server connection
+    # MSSQL Server connection with enhanced error handling
     from urllib.parse import quote_plus
     
-    # Encode credentials for URL
-    encoded_username = quote_plus(mssql_username)
-    encoded_password = quote_plus(mssql_password)
-    encoded_server = quote_plus(mssql_server)
-    encoded_database = quote_plus(mssql_database)
-    
-    # Build MSSQL connection string
-    mssql_url = f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
-    
-    app.config["SQLALCHEMY_DATABASE_URI"] = mssql_url
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_recycle": 300,
-        "pool_pre_ping": True,
-        "pool_size": 10,
-        "max_overflow": 20,
-        "pool_timeout": 30
-    }
-    logging.info(f"Using MSSQL database: {mssql_server}/{mssql_database}")
-    
+    try:
+        # Encode credentials for URL
+        encoded_username = quote_plus(mssql_username)
+        encoded_password = quote_plus(mssql_password)
+        encoded_server = quote_plus(mssql_server)
+        encoded_database = quote_plus(mssql_database)
+        
+        # Try multiple connection configurations
+        connection_configs = [
+            # Configuration 1: TCP/IP connection
+            {
+                'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes",
+                'description': 'ODBC Driver 17 with TCP/IP'
+            },
+            # Configuration 2: Named Pipes disabled
+            {
+                'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&Trusted_Connection=no",
+                'description': 'ODBC Driver 17 without Named Pipes'
+            },
+            # Configuration 3: SQL Server driver fallback
+            {
+                'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=SQL+Server&TrustServerCertificate=yes",
+                'description': 'SQL Server driver'
+            }
+        ]
+        
+        mssql_connected = False
+        for config in connection_configs:
+            try:
+                logging.info(f"Trying MSSQL connection: {config['description']}")
+                app.config["SQLALCHEMY_DATABASE_URI"] = config['url']
+                app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+                    "pool_recycle": 300,
+                    "pool_pre_ping": True,
+                    "pool_size": 5,
+                    "max_overflow": 10,
+                    "pool_timeout": 10,
+                    "connect_args": {
+                        "timeout": 10,
+                        "autocommit": False
+                    }
+                }
+                
+                # Test the connection
+                from sqlalchemy import create_engine, text
+                test_engine = create_engine(config['url'])
+                with test_engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                    logging.info(f"✅ MSSQL connection successful: {mssql_server}/{mssql_database}")
+                    mssql_connected = True
+                    break
+                    
+            except Exception as e:
+                logging.warning(f"❌ MSSQL connection failed with {config['description']}: {e}")
+                continue
+        
+        if not mssql_connected:
+            logging.error(f"❌ All MSSQL connection attempts failed for {mssql_server}/{mssql_database}")
+            logging.info("Falling back to available database...")
+            raise Exception("MSSQL connection failed")
+            
+    except Exception as e:
+        logging.error(f"MSSQL connection error: {e}")
+        logging.info("Falling back to available database...")
+        # Fall through to next database option
+        
 elif database_url:
     # Replit environment with PostgreSQL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
