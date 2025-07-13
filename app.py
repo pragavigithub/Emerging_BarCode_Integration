@@ -34,18 +34,96 @@ app.secret_key = os.environ.get(
     "SESSION_SECRET") or "dev-secret-key-change-in-production"
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure database - handle MSSQL, PostgreSQL, and SQLite
+# Configure database - handle MySQL, MSSQL, PostgreSQL, and SQLite
+mysql_host = os.environ.get("MYSQL_HOST")
+mysql_port = os.environ.get("MYSQL_PORT", "3306")
+mysql_database = os.environ.get("MYSQL_DATABASE")
+mysql_username = os.environ.get("MYSQL_USERNAME")
+mysql_password = os.environ.get("MYSQL_PASSWORD")
 mssql_server = os.environ.get("MSSQL_SERVER")
 mssql_database = os.environ.get("MSSQL_DATABASE")
 mssql_username = os.environ.get("MSSQL_USERNAME")
 mssql_password = os.environ.get("MSSQL_PASSWORD")
 database_url = os.environ.get("DATABASE_URL")
 
-# Database connection priority: MSSQL > PostgreSQL > SQLite
+# Database connection priority: MySQL > MSSQL > PostgreSQL > SQLite
 database_configured = False
 
-# Try MSSQL first (only if all required variables are set and not empty)
-if (mssql_server and mssql_server.strip() and 
+# Try MySQL first (only if all required variables are set and not empty)
+if (mysql_host and mysql_host.strip() and 
+    mysql_database and mysql_database.strip() and 
+    mysql_username and mysql_username.strip() and 
+    mysql_password and mysql_password.strip()):
+    
+    try:
+        from urllib.parse import quote_plus
+        
+        # Encode credentials for URL
+        encoded_username = quote_plus(mysql_username)
+        encoded_password = quote_plus(mysql_password)
+        encoded_host = quote_plus(mysql_host)
+        encoded_database = quote_plus(mysql_database)
+        
+        # Try multiple MySQL connection configurations
+        connection_configs = [
+            # Configuration 1: PyMySQL connector (recommended)
+            {
+                'url': f"mysql+pymysql://{encoded_username}:{encoded_password}@{encoded_host}:{mysql_port}/{encoded_database}?charset=utf8mb4",
+                'description': 'PyMySQL connector'
+            },
+            # Configuration 2: MySQL Connector/Python
+            {
+                'url': f"mysql+mysqlconnector://{encoded_username}:{encoded_password}@{encoded_host}:{mysql_port}/{encoded_database}?charset=utf8mb4",
+                'description': 'MySQL Connector/Python'
+            },
+            # Configuration 3: PyMySQL with SSL disabled
+            {
+                'url': f"mysql+pymysql://{encoded_username}:{encoded_password}@{encoded_host}:{mysql_port}/{encoded_database}?charset=utf8mb4&ssl_disabled=true",
+                'description': 'PyMySQL without SSL'
+            }
+        ]
+        
+        for config in connection_configs:
+            try:
+                logging.info(f"Trying MySQL connection: {config['description']}")
+                
+                # Test the connection first
+                from sqlalchemy import create_engine, text
+                test_engine = create_engine(config['url'], pool_timeout=5)
+                with test_engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                    # Connection successful, configure Flask
+                    app.config["SQLALCHEMY_DATABASE_URI"] = config['url']
+                    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+                        "pool_recycle": 300,
+                        "pool_pre_ping": True,
+                        "pool_size": 5,
+                        "max_overflow": 10,
+                        "pool_timeout": 10,
+                        "connect_args": {
+                            "connect_timeout": 30,
+                            "autocommit": False
+                        }
+                    }
+                    logging.info(f"✅ MySQL connection successful: {mysql_host}:{mysql_port}/{mysql_database}")
+                    database_configured = True
+                    break
+                    
+            except Exception as e:
+                logging.warning(f"❌ MySQL connection failed with {config['description']}: {e}")
+                continue
+        
+        if not database_configured:
+            logging.error(f"❌ All MySQL connection attempts failed for {mysql_host}:{mysql_port}/{mysql_database}")
+            logging.info("Falling back to next database option...")
+            
+    except Exception as e:
+        logging.error(f"MySQL connection error: {e}")
+        logging.info("Falling back to next database option...")
+
+# Try MSSQL second (only if all required variables are set and not empty)
+if (not database_configured and 
+    mssql_server and mssql_server.strip() and 
     mssql_database and mssql_database.strip() and 
     mssql_username and mssql_username.strip() and 
     mssql_password and mssql_password.strip()):
@@ -132,7 +210,7 @@ if (mssql_server and mssql_server.strip() and
         logging.info("MSSQL configuration detected but not supported on this platform (non-Windows)")
         logging.info("Falling back to next database option...")
 
-# Try PostgreSQL if MSSQL failed or not configured
+# Try PostgreSQL if MySQL and MSSQL failed or not configured
 if not database_configured and database_url:
     # Replit environment with PostgreSQL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url

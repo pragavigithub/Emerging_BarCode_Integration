@@ -458,9 +458,10 @@ class SAPIntegration:
                     if not existing:
                         # Insert new warehouse as branch - use compatible SQL
                         import os
-                        is_postgresql = 'postgresql' in os.environ.get('DATABASE_URL', '').lower()
+                        from app import app
+                        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
                         
-                        if is_postgresql:
+                        if 'postgresql' in db_uri.lower() or 'mysql' in db_uri.lower():
                             insert_sql = """
                                 INSERT INTO branches (id, name, address, is_active, created_at, updated_at)
                                 VALUES (:id, :name, :address, :is_active, NOW(), NOW())
@@ -480,9 +481,10 @@ class SAPIntegration:
                     else:
                         # Update existing warehouse - use compatible SQL
                         import os
-                        is_postgresql = 'postgresql' in os.environ.get('DATABASE_URL', '').lower()
+                        from app import app
+                        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
                         
-                        if is_postgresql:
+                        if 'postgresql' in db_uri.lower() or 'mysql' in db_uri.lower():
                             update_sql = """
                                 UPDATE branches SET 
                                     name = :name, 
@@ -543,12 +545,12 @@ class SAPIntegration:
                 bins = response.json().get('value', [])
                 
                 # Create bins table if not exists - use compatible SQL
-                from app import db
+                from app import db, app
                 import os
                 
-                is_postgresql = 'postgresql' in os.environ.get('DATABASE_URL', '').lower()
+                db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
                 
-                if is_postgresql:
+                if 'postgresql' in db_uri.lower():
                     create_table_sql = """
                         CREATE TABLE IF NOT EXISTS bin_locations (
                             id SERIAL PRIMARY KEY,
@@ -559,6 +561,19 @@ class SAPIntegration:
                             created_at TIMESTAMP DEFAULT NOW(),
                             updated_at TIMESTAMP DEFAULT NOW(),
                             UNIQUE(bin_code, warehouse_code)
+                        )
+                    """
+                elif 'mysql' in db_uri.lower():
+                    create_table_sql = """
+                        CREATE TABLE IF NOT EXISTS bin_locations (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            bin_code VARCHAR(50) NOT NULL,
+                            warehouse_code VARCHAR(10) NOT NULL,
+                            bin_name VARCHAR(100),
+                            is_active BOOLEAN DEFAULT TRUE,
+                            created_at TIMESTAMP DEFAULT NOW(),
+                            updated_at TIMESTAMP DEFAULT NOW() ON UPDATE NOW(),
+                            UNIQUE KEY unique_bin_warehouse (bin_code, warehouse_code)
                         )
                     """
                 else:
@@ -585,16 +600,34 @@ class SAPIntegration:
                     wh_code = bin_data.get('Warehouse')  # Use 'Warehouse' not 'WarehouseCode'
                     
                     if bin_code and wh_code:
-                        # Upsert bin location
-                        db.session.execute(db.text("""
-                            INSERT INTO bin_locations (bin_code, warehouse_code, bin_name, is_active, created_at, updated_at)
-                            VALUES (:bin_code, :warehouse_code, :bin_name, :is_active, NOW(), NOW())
-                            ON CONFLICT (bin_code, warehouse_code) 
-                            DO UPDATE SET 
-                                bin_name = EXCLUDED.bin_name,
-                                is_active = EXCLUDED.is_active,
-                                updated_at = NOW()
-                        """), {
+                        # Upsert bin location - use database-specific syntax
+                        if 'postgresql' in db_uri.lower():
+                            upsert_sql = """
+                                INSERT INTO bin_locations (bin_code, warehouse_code, bin_name, is_active, created_at, updated_at)
+                                VALUES (:bin_code, :warehouse_code, :bin_name, :is_active, NOW(), NOW())
+                                ON CONFLICT (bin_code, warehouse_code) 
+                                DO UPDATE SET 
+                                    bin_name = EXCLUDED.bin_name,
+                                    is_active = EXCLUDED.is_active,
+                                    updated_at = NOW()
+                            """
+                        elif 'mysql' in db_uri.lower():
+                            upsert_sql = """
+                                INSERT INTO bin_locations (bin_code, warehouse_code, bin_name, is_active, created_at, updated_at)
+                                VALUES (:bin_code, :warehouse_code, :bin_name, :is_active, NOW(), NOW())
+                                ON DUPLICATE KEY UPDATE 
+                                    bin_name = VALUES(bin_name),
+                                    is_active = VALUES(is_active),
+                                    updated_at = NOW()
+                            """
+                        else:
+                            # SQLite - use INSERT OR REPLACE
+                            upsert_sql = """
+                                INSERT OR REPLACE INTO bin_locations (bin_code, warehouse_code, bin_name, is_active, created_at, updated_at)
+                                VALUES (:bin_code, :warehouse_code, :bin_name, :is_active, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            """
+                        
+                        db.session.execute(db.text(upsert_sql), {
                             "bin_code": bin_code,
                             "warehouse_code": wh_code,
                             "bin_name": bin_data.get('Description', ''),
