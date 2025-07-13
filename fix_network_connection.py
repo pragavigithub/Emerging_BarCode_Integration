@@ -148,10 +148,10 @@ def create_local_fallback_env():
     
     fallback_env = """# Local SQL Server Fallback Configuration
 # Use this if remote connection fails
-MSSQL_SERVER=localhost\\SQLEXPRESS
+MSSQL_SERVER=192.168.1.5\\SQLEXPRESS
 MSSQL_DATABASE=WMS_DB
 MSSQL_USERNAME=sa
-MSSQL_PASSWORD=your_local_password
+MSSQL_PASSWORD=Ea@12345
 
 # Or use these environment variables to disable MSSQL
 # and use SQLite instead:
@@ -167,7 +167,7 @@ SESSION_SECRET=your-secret-key-change-in-production
 SAP_B1_SERVER=https://192.168.1.5:50000
 SAP_B1_USERNAME=manager
 SAP_B1_PASSWORD=Ea@12345
-SAP_B1_COMPANY_DB=Test_Hutchinson
+SAP_B1_COMPANY_DB=EINV-TESTDB-LIVE-HUST
 """
     
     with open('.env.local', 'w') as f:

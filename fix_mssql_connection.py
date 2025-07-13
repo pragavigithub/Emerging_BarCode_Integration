@@ -49,10 +49,10 @@ def check_tcp_ip_enabled():
 
 def test_basic_connection():
     """Test basic connection to SQL Server"""
-    server = os.environ.get('MSSQL_SERVER', 'localhost\\SQLEXPRESS')
-    database = os.environ.get('MSSQL_DATABASE', 'WMS_DB')
-    username = os.environ.get('MSSQL_USERNAME', '')
-    password = os.environ.get('MSSQL_PASSWORD', '')
+    server = os.environ.get('MSSQL_SERVER')
+    database = os.environ.get('MSSQL_DATABASE')
+    username = os.environ.get('MSSQL_USERNAME')
+    password = os.environ.get('MSSQL_PASSWORD')
     
     if not username or not password:
         logging.error("❌ MSSQL username or password not set in environment variables")

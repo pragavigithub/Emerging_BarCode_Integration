@@ -14,10 +14,10 @@ def create_env_file():
     
     # Default values for your setup
     default_values = {
-        'MSSQL_SERVER': 'localhost\\SQLEXPRESS',
+        'MSSQL_SERVER': '192.168.1.5\\SQLEXPRESS',
         'MSSQL_DATABASE': 'WMS_DB',
         'MSSQL_USERNAME': 'sa',
-        'MSSQL_PASSWORD': 'your_password'
+        'MSSQL_PASSWORD': 'Ea@12345'
     }
     
     print("💡 Connection Options:")
@@ -47,14 +47,14 @@ def create_env_file():
     for key, default in default_values.items():
         if key == 'MSSQL_SERVER':
             print("Server name options:")
-            print("1. localhost\\SQLEXPRESS")
+            print("1. 192.168.1.5\\SQLEXPRESS")
             print("2. .\\SQLEXPRESS")
             print("3. DESKTOP-PLFK2B5\\SQLEXPRESS")
             print("4. Custom")
             
             choice = input(f"Choose server (1-4) or press Enter for default [{default}]: ").strip()
             if choice == '1':
-                env_vars[key] = 'localhost\\SQLEXPRESS'
+                env_vars[key] = '192.168.1.5\\SQLEXPRESS'
             elif choice == '2':
                 env_vars[key] = '.\\SQLEXPRESS'
             elif choice == '3':
