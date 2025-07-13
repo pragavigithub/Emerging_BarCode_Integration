@@ -6,6 +6,16 @@ from flask_login import LoginManager
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    logging.info("Environment variables loaded from .env file")
+except ImportError:
+    logging.info("python-dotenv not installed, using system environment variables")
+except Exception as e:
+    logging.warning(f"Could not load .env file: {e}")
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -94,12 +104,14 @@ if mssql_server and mssql_database and mssql_username and mssql_password:
         if not mssql_connected:
             logging.error(f"❌ All MSSQL connection attempts failed for {mssql_server}/{mssql_database}")
             logging.info("Falling back to available database...")
-            raise Exception("MSSQL connection failed")
+            # Clear MSSQL config and fall through to next option
+            mssql_server = None
             
     except Exception as e:
         logging.error(f"MSSQL connection error: {e}")
         logging.info("Falling back to available database...")
-        # Fall through to next database option
+        # Clear MSSQL config and fall through to next option
+        mssql_server = None
         
 elif database_url:
     # Replit environment with PostgreSQL

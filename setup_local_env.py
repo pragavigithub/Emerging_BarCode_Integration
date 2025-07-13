@@ -20,6 +20,28 @@ def create_env_file():
         'MSSQL_PASSWORD': 'your_password'
     }
     
+    print("💡 Connection Options:")
+    print("1. Local SQL Server (recommended for development)")
+    print("2. Remote SQL Server (requires network access)")
+    print("3. Skip MSSQL (use SQLite for development)")
+    print()
+    
+    choice = input("Choose option (1-3): ").strip()
+    
+    if choice == '3':
+        # Skip MSSQL configuration
+        env_vars = {
+            'MSSQL_SERVER': '',
+            'MSSQL_DATABASE': '',
+            'MSSQL_USERNAME': '',
+            'MSSQL_PASSWORD': ''
+        }
+        print("✅ MSSQL disabled. Application will use SQLite for development.")
+    elif choice == '2':
+        print("⚠️  Remote SQL Server requires proper network configuration")
+        print("Make sure SQL Server is configured for remote connections")
+        print()
+    
     env_vars = {}
     
     for key, default in default_values.items():

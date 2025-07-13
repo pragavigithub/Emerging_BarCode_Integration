@@ -49,7 +49,7 @@ def check_tcp_ip_enabled():
 
 def test_basic_connection():
     """Test basic connection to SQL Server"""
-    server = os.environ.get('MSSQL_SERVER', 'DESKTOP-PLFK2B5\\SQLEXPRESS')
+    server = os.environ.get('MSSQL_SERVER', 'localhost\\SQLEXPRESS')
     database = os.environ.get('MSSQL_DATABASE', 'WMS_DB')
     username = os.environ.get('MSSQL_USERNAME', '')
     password = os.environ.get('MSSQL_PASSWORD', '')
