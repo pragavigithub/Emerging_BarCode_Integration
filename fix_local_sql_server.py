@@ -218,24 +218,24 @@ def test_sql_connection():
             cursor = conn.cursor()
             cursor.execute("SELECT @@VERSION")
             result = cursor.fetchone()
-            print(f"✅ SUCCESS: {server}")
+            print(f"SUCCESS: {server}")
             print(f"   Version: {result[0][:50]}...")
             conn.close()
             break
         except Exception as e:
-            print(f"❌ FAILED: {server} - {e}")
+            print(f"FAILED: {server} - {e}")
     
 if __name__ == "__main__":
     test_sql_connection()
 """
     
     try:
-        with open('test_sql_connection.py', 'w') as f:
+        with open('test_sql_connection.py', 'w', encoding='utf-8') as f:
             f.write(test_script)
-        print("✅ Created test_sql_connection.py script")
+        print("Created test_sql_connection.py script")
         return True
     except Exception as e:
-        print(f"❌ Error creating test script: {e}")
+        print(f"Error creating test script: {e}")
         return False
 
 def main():

@@ -1,134 +1,162 @@
 #!/usr/bin/env python3
 """
-Quick Environment Setup for Local Development
-This script sets up environment variables for MSSQL connection.
+Simple Local Environment Setup for WMS
+Creates a working environment configuration for local development
 """
 
 import os
-import sys
+import platform
 
-def create_env_file():
-    """Create .env file with MSSQL configuration"""
-    print("🔧 Setting up environment variables for local development")
-    print()
-    
-    # Default values for your setup
-    default_values = {
-        'MSSQL_SERVER': '192.168.1.5\\SQLEXPRESS',
-        'MSSQL_DATABASE': 'WMS_DB',
-        'MSSQL_USERNAME': 'sa',
-        'MSSQL_PASSWORD': 'Ea@12345'
-    }
-    
-    print("💡 Connection Options:")
-    print("1. Local SQL Server (recommended for development)")
-    print("2. Remote SQL Server (requires network access)")
-    print("3. Skip MSSQL (use SQLite for development)")
-    print()
-    
-    choice = input("Choose option (1-3): ").strip()
-    
-    if choice == '3':
-        # Skip MSSQL configuration
-        env_vars = {
-            'MSSQL_SERVER': '',
-            'MSSQL_DATABASE': '',
-            'MSSQL_USERNAME': '',
-            'MSSQL_PASSWORD': ''
-        }
-        print("✅ MSSQL disabled. Application will use SQLite for development.")
-    elif choice == '2':
-        print("⚠️  Remote SQL Server requires proper network configuration")
-        print("Make sure SQL Server is configured for remote connections")
-        print()
-    
-    env_vars = {}
-    
-    for key, default in default_values.items():
-        if key == 'MSSQL_SERVER':
-            print("Server name options:")
-            print("1. 192.168.1.5\\SQLEXPRESS")
-            print("2. .\\SQLEXPRESS")
-            print("3. DESKTOP-PLFK2B5\\SQLEXPRESS")
-            print("4. Custom")
-            
-            choice = input(f"Choose server (1-4) or press Enter for default [{default}]: ").strip()
-            if choice == '1':
-                env_vars[key] = '192.168.1.5\\SQLEXPRESS'
-            elif choice == '2':
-                env_vars[key] = '.\\SQLEXPRESS'
-            elif choice == '3':
-                env_vars[key] = 'DESKTOP-PLFK2B5\\SQLEXPRESS'
-            elif choice == '4':
-                env_vars[key] = input("Enter custom server name: ").strip()
-            else:
-                env_vars[key] = default
-        else:
-            value = input(f"Enter {key} [{default}]: ").strip()
-            env_vars[key] = value if value else default
-    
-    # Create .env file
-    env_content = f"""# MSSQL Database Configuration
-MSSQL_SERVER={env_vars['MSSQL_SERVER']}
-MSSQL_DATABASE={env_vars['MSSQL_DATABASE']}
-MSSQL_USERNAME={env_vars['MSSQL_USERNAME']}
-MSSQL_PASSWORD={env_vars['MSSQL_PASSWORD']}
+def print_header(title):
+    """Print formatted header"""
+    print("=" * 50)
+    print(f" {title}")
+    print("=" * 50)
 
-# Session Secret
-SESSION_SECRET=your-secret-key-change-in-production
+def create_working_env():
+    """Create a working .env file for local development"""
+    computer_name = platform.node()
+    
+    # Create .env content optimized for your environment
+    env_content = f"""# WMS Local Development Environment
+# Computer: {computer_name}
+# SQL Server: {computer_name}\\SQLEXPRESS
 
-# SAP B1 Configuration
+# Local SQL Server Configuration (Primary)
+MSSQL_SERVER={computer_name}\\SQLEXPRESS
+MSSQL_DATABASE=WMS_DB
+MSSQL_USERNAME=sa
+MSSQL_PASSWORD=Ea@12345
+
+# Flask Configuration
+SESSION_SECRET=local-dev-secret-key-{computer_name}
+
+# SAP B1 Configuration (offline mode - will use mock data)
+# Update these when you have actual SAP B1 server
 SAP_B1_SERVER=https://192.168.1.5:50000
 SAP_B1_USERNAME=manager
-SAP_B1_PASSWORD=1422
-SAP_B1_COMPANY_DB=EINV-TESTDB-LIVE-HUST
+SAP_B1_PASSWORD=Ea@12345
+SAP_B1_COMPANY_DB=Test_Hutchinson
+
+# Development Settings
+FLASK_ENV=development
+FLASK_DEBUG=1
+
+# Alternative configurations for testing:
+# If SQL Server doesn't work, comment out MSSQL_ variables above
+# The app will automatically fall back to SQLite database
 """
+
+    try:
+        # Backup existing .env
+        if os.path.exists('.env'):
+            backup_name = '.env.backup'
+            counter = 1
+            while os.path.exists(backup_name):
+                backup_name = f'.env.backup.{counter}'
+                counter += 1
+            
+            os.rename('.env', backup_name)
+            print(f"Backed up existing .env to {backup_name}")
+        
+        # Write new .env
+        with open('.env', 'w', encoding='utf-8') as f:
+            f.write(env_content)
+        
+        print("Created .env file for local development")
+        return True
+        
+    except Exception as e:
+        print(f"Error creating .env file: {e}")
+        return False
+
+def create_run_script():
+    """Create a simple run script for local development"""
     
-    with open('.env', 'w') as f:
-        f.write(env_content)
+    if platform.system() == 'Windows':
+        script_content = """@echo off
+echo Starting WMS Local Development Server...
+echo.
+echo Computer: %COMPUTERNAME%
+echo Database: Will try SQL Server, fallback to SQLite
+echo.
+python main.py
+pause
+"""
+        script_name = 'run_local.bat'
+    else:
+        script_content = """#!/bin/bash
+echo "Starting WMS Local Development Server..."
+echo ""
+echo "Computer: $(hostname)"
+echo "Database: Will try SQL Server, fallback to SQLite"
+echo ""
+python main.py
+"""
+        script_name = 'run_local.sh'
     
-    print(f"\n✅ Environment variables saved to .env file")
-    print(f"Server: {env_vars['MSSQL_SERVER']}")
-    print(f"Database: {env_vars['MSSQL_DATABASE']}")
-    print(f"Username: {env_vars['MSSQL_USERNAME']}")
-    print()
+    try:
+        with open(script_name, 'w', encoding='utf-8') as f:
+            f.write(script_content)
+        
+        if platform.system() != 'Windows':
+            os.chmod(script_name, 0o755)
+        
+        print(f"Created {script_name} for easy startup")
+        return True
+        
+    except Exception as e:
+        print(f"Error creating run script: {e}")
+        return False
+
+def show_next_steps():
+    """Show next steps for setup"""
+    computer_name = platform.node()
     
-    # Show how to load .env file
-    print("📋 To use the .env file, install python-dotenv:")
-    print("pip install python-dotenv")
-    print()
-    print("Then add this to your main.py:")
-    print("from dotenv import load_dotenv")
-    print("load_dotenv()")
-    print()
-    print("Or set system environment variables manually.")
-    
-    return env_vars
+    print("\nNext Steps:")
+    print("1. Configure SQL Server (if you want to use it):")
+    print("   a. Run as Administrator: python enable_sql_server_tcp.py")
+    print("   b. Or manually enable TCP/IP in SQL Server Configuration Manager")
+    print("")
+    print("2. Test your setup:")
+    print("   - Run: python main.py")
+    print("   - Open browser: http://localhost:5000")
+    print("   - Default login: admin / admin")
+    print("")
+    print("3. Database options:")
+    print("   - SQL Server: Requires configuration above")
+    print("   - SQLite: Works automatically (no setup needed)")
+    print("")
+    print("4. If SQL Server doesn't work:")
+    print("   - Comment out MSSQL_ lines in .env file")
+    print("   - App will use SQLite automatically")
+    print("")
+    print(f"Your computer name: {computer_name}")
+    print(f"SQL Server instance: {computer_name}\\SQLEXPRESS")
 
 def main():
     """Main setup function"""
-    print("=== WMS Local Environment Setup ===")
-    print()
+    print_header("WMS Local Environment Setup")
     
-    # Check if .env already exists
-    if os.path.exists('.env'):
-        overwrite = input(".env file already exists. Overwrite? (y/n): ").strip().lower()
-        if overwrite != 'y':
-            print("Setup cancelled.")
-            return
+    success_count = 0
     
-    try:
-        create_env_file()
-        print("\n🎉 Setup complete!")
-        print()
-        print("Next steps:")
-        print("1. Make sure SQL Server is running")
-        print("2. Create WMS_DB database")
-        print("3. Run: python fix_mssql_connection.py (to test connection)")
-        print("4. Run: python main.py (to start the app)")
-        
-    except Exception as e:
-        print(f"❌ Setup failed: {e}")
+    # Create .env file
+    if create_working_env():
+        success_count += 1
+    
+    # Create run script
+    if create_run_script():
+        success_count += 1
+    
+    print("")
+    print_header("Setup Complete")
+    print(f"Successfully completed {success_count}/2 setup steps")
+    
+    if success_count == 2:
+        print("Local environment is ready!")
+        show_next_steps()
+    else:
+        print("Setup had some issues. You may need to create files manually.")
 
 if __name__ == "__main__":
     main()
