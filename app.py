@@ -62,22 +62,32 @@ if (mssql_server and mssql_server.strip() and
             encoded_server = quote_plus(mssql_server)
             encoded_database = quote_plus(mssql_database)
             
-            # Try multiple connection configurations
+            # Try multiple connection configurations for better compatibility
             connection_configs = [
-                # Configuration 1: TCP/IP connection
+                # Configuration 1: ODBC Driver 17 with TCP/IP and timeout settings
                 {
-                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes",
-                    'description': 'ODBC Driver 17 with TCP/IP'
+                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&timeout=30&login_timeout=30",
+                    'description': 'ODBC Driver 17 with TCP/IP and timeouts'
                 },
-                # Configuration 2: Named Pipes disabled
+                # Configuration 2: ODBC Driver 17 with connection pooling disabled
                 {
-                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&Trusted_Connection=no",
-                    'description': 'ODBC Driver 17 without Named Pipes'
+                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&Pooling=false",
+                    'description': 'ODBC Driver 17 without connection pooling'
                 },
-                # Configuration 3: SQL Server driver fallback
+                # Configuration 3: ODBC Driver 17 with Mars disabled  
+                {
+                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&MARS_Connection=no",
+                    'description': 'ODBC Driver 17 without MARS'
+                },
+                # Configuration 4: SQL Server Native Client fallback
+                {
+                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=SQL+Server+Native+Client+11.0&TrustServerCertificate=yes",
+                    'description': 'SQL Server Native Client 11.0'
+                },
+                # Configuration 5: Legacy SQL Server driver
                 {
                     'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=SQL+Server&TrustServerCertificate=yes",
-                    'description': 'SQL Server driver'
+                    'description': 'Legacy SQL Server driver'
                 }
             ]
             
