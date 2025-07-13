@@ -1,0 +1,41 @@
+DIRECT MySQL Commands to Fix the Issue
+=====================================
+
+Copy and paste these commands directly into your MySQL client:
+
+-- Connect to your database first
+USE wms_db;
+
+-- Add the missing notes column (this is the immediate fix needed)
+ALTER TABLE grpo_documents ADD COLUMN notes TEXT;
+
+-- Add other missing columns for full functionality
+ALTER TABLE grpo_documents ADD COLUMN qc_notes TEXT;
+ALTER TABLE grpo_documents ADD COLUMN draft_or_post VARCHAR(10) DEFAULT 'draft';
+
+-- Add missing columns to grpo_items table
+ALTER TABLE grpo_items ADD COLUMN generated_barcode VARCHAR(100);
+ALTER TABLE grpo_items ADD COLUMN barcode_printed BOOLEAN DEFAULT FALSE;
+ALTER TABLE grpo_items ADD COLUMN qc_status VARCHAR(20) DEFAULT 'pending';
+ALTER TABLE grpo_items ADD COLUMN qc_notes TEXT;
+
+-- Verify the changes
+DESCRIBE grpo_documents;
+DESCRIBE grpo_items;
+
+-- If any command gives "Duplicate column name" error, that's OK - it means the column already exists
+
+IMPORTANT NOTES:
+===============
+1. Run these commands in MySQL Workbench or MySQL command line
+2. Make sure you're connected to the correct database (wms_db)
+3. If you get "Duplicate column name" errors, that's normal - skip those commands
+4. The most important command is the first one: ALTER TABLE grpo_documents ADD COLUMN notes TEXT;
+
+ALTERNATIVE - Quick Single Command:
+==================================
+If you just want to fix the immediate error, run only this:
+
+ALTER TABLE grpo_documents ADD COLUMN notes TEXT;
+
+This single command will resolve the "Unknown column 'grpo_documents.notes'" error.
