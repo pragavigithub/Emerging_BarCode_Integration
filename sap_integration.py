@@ -665,40 +665,98 @@ class SAPIntegration:
             if response.status_code == 200:
                 partners = response.json().get('value', [])
                 
-                from app import db
+                from app import db, app
                 
-                # Create business_partners table if not exists
-                db.session.execute(db.text("""
-                    CREATE TABLE IF NOT EXISTS business_partners (
-                        id SERIAL PRIMARY KEY,
-                        card_code VARCHAR(50) UNIQUE NOT NULL,
-                        card_name VARCHAR(200) NOT NULL,
-                        card_type VARCHAR(20) NOT NULL,
-                        phone VARCHAR(50),
-                        email VARCHAR(100),
-                        address TEXT,
-                        is_active BOOLEAN DEFAULT TRUE,
-                        created_at TIMESTAMP DEFAULT NOW(),
-                        updated_at TIMESTAMP DEFAULT NOW()
-                    )
-                """))
+                # Create business_partners table if not exists - use database-specific syntax
+                db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+                
+                if 'postgresql' in db_uri.lower():
+                    create_table_sql = """
+                        CREATE TABLE IF NOT EXISTS business_partners (
+                            id SERIAL PRIMARY KEY,
+                            card_code VARCHAR(50) UNIQUE NOT NULL,
+                            card_name VARCHAR(200) NOT NULL,
+                            card_type VARCHAR(20) NOT NULL,
+                            phone VARCHAR(50),
+                            email VARCHAR(100),
+                            address TEXT,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            created_at TIMESTAMP DEFAULT NOW(),
+                            updated_at TIMESTAMP DEFAULT NOW()
+                        )
+                    """
+                elif 'mysql' in db_uri.lower():
+                    create_table_sql = """
+                        CREATE TABLE IF NOT EXISTS business_partners (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            card_code VARCHAR(50) UNIQUE NOT NULL,
+                            card_name VARCHAR(200) NOT NULL,
+                            card_type VARCHAR(20) NOT NULL,
+                            phone VARCHAR(50),
+                            email VARCHAR(100),
+                            address TEXT,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            created_at TIMESTAMP DEFAULT NOW(),
+                            updated_at TIMESTAMP DEFAULT NOW() ON UPDATE NOW()
+                        )
+                    """
+                else:
+                    create_table_sql = """
+                        CREATE TABLE IF NOT EXISTS business_partners (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            card_code VARCHAR(50) UNIQUE NOT NULL,
+                            card_name VARCHAR(200) NOT NULL,
+                            card_type VARCHAR(20) NOT NULL,
+                            phone VARCHAR(50),
+                            email VARCHAR(100),
+                            address TEXT,
+                            is_active BOOLEAN DEFAULT 1,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """
+                
+                db.session.execute(db.text(create_table_sql))
                 
                 for partner in partners:
                     card_code = partner.get('CardCode')
                     if card_code:
-                        db.session.execute(db.text("""
-                            INSERT INTO business_partners (card_code, card_name, card_type, phone, email, address, is_active, created_at, updated_at)
-                            VALUES (:card_code, :card_name, :card_type, :phone, :email, :address, :is_active, NOW(), NOW())
-                            ON CONFLICT (card_code) 
-                            DO UPDATE SET 
-                                card_name = EXCLUDED.card_name,
-                                card_type = EXCLUDED.card_type,
-                                phone = EXCLUDED.phone,
-                                email = EXCLUDED.email,
-                                address = EXCLUDED.address,
-                                is_active = EXCLUDED.is_active,
-                                updated_at = NOW()
-                        """), {
+                        # Use database-specific upsert syntax
+                        if 'postgresql' in db_uri.lower():
+                            upsert_sql = """
+                                INSERT INTO business_partners (card_code, card_name, card_type, phone, email, address, is_active, created_at, updated_at)
+                                VALUES (:card_code, :card_name, :card_type, :phone, :email, :address, :is_active, NOW(), NOW())
+                                ON CONFLICT (card_code) 
+                                DO UPDATE SET 
+                                    card_name = EXCLUDED.card_name,
+                                    card_type = EXCLUDED.card_type,
+                                    phone = EXCLUDED.phone,
+                                    email = EXCLUDED.email,
+                                    address = EXCLUDED.address,
+                                    is_active = EXCLUDED.is_active,
+                                    updated_at = NOW()
+                            """
+                        elif 'mysql' in db_uri.lower():
+                            upsert_sql = """
+                                INSERT INTO business_partners (card_code, card_name, card_type, phone, email, address, is_active, created_at, updated_at)
+                                VALUES (:card_code, :card_name, :card_type, :phone, :email, :address, :is_active, NOW(), NOW())
+                                ON DUPLICATE KEY UPDATE 
+                                    card_name = VALUES(card_name),
+                                    card_type = VALUES(card_type),
+                                    phone = VALUES(phone),
+                                    email = VALUES(email),
+                                    address = VALUES(address),
+                                    is_active = VALUES(is_active),
+                                    updated_at = NOW()
+                            """
+                        else:
+                            # SQLite - use INSERT OR REPLACE
+                            upsert_sql = """
+                                INSERT OR REPLACE INTO business_partners (card_code, card_name, card_type, phone, email, address, is_active, created_at, updated_at)
+                                VALUES (:card_code, :card_name, :card_type, :phone, :email, :address, :is_active, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            """
+                        
+                        db.session.execute(db.text(upsert_sql), {
                             "card_code": card_code,
                             "card_name": partner.get('CardName', ''),
                             "card_type": partner.get('CardType', ''),
