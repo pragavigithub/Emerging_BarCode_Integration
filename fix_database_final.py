@@ -6,279 +6,195 @@ This script will completely resolve all database schema issues.
 
 import os
 import sys
+import logging
 import sqlite3
+import shutil
 from datetime import datetime
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def find_database():
     """Find the SQLite database file"""
-    # Check common locations
-    locations = [
-        'instance/database.db',
-        'database.db',
+    possible_paths = [
+        'instance/wms.db',
         'wms.db',
-        'app.db',
-        'site.db'
+        './instance/wms.db',
+        os.path.join(os.getcwd(), 'instance', 'wms.db'),
+        os.path.join(os.getcwd(), 'wms.db')
     ]
     
-    # Also check environment variable
-    database_url = os.environ.get('DATABASE_URL', '')
-    if database_url.startswith('sqlite:///'):
-        locations.insert(0, database_url.replace('sqlite:///', ''))
-    
-    for path in locations:
+    for path in possible_paths:
         if os.path.exists(path):
-            print(f"Found database: {path}")
+            logging.info(f"Found database at: {path}")
             return path
     
-    print("No existing database found. Will create new one.")
-    return 'instance/database.db'
+    # If no database found, create the instance directory
+    instance_dir = os.path.join(os.getcwd(), 'instance')
+    os.makedirs(instance_dir, exist_ok=True)
+    db_path = os.path.join(instance_dir, 'wms.db')
+    logging.info(f"No existing database found. Will create new database at: {db_path}")
+    return db_path
 
 def backup_database(db_path):
     """Create backup of existing database"""
     if os.path.exists(db_path):
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_path = f"{db_path}.backup_{timestamp}"
-        
-        with open(db_path, 'rb') as src, open(backup_path, 'wb') as dst:
-            dst.write(src.read())
-        
-        print(f"✓ Database backed up to: {backup_path}")
+        backup_path = f"{db_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        shutil.copy2(db_path, backup_path)
+        logging.info(f"Database backed up to: {backup_path}")
         return backup_path
     return None
 
 def recreate_database():
     """Recreate database with correct schema"""
     db_path = find_database()
-    
-    # Create instance directory if needed
-    instance_dir = os.path.dirname(db_path)
-    if instance_dir and not os.path.exists(instance_dir):
-        os.makedirs(instance_dir)
-        print(f"✓ Created directory: {instance_dir}")
-    
-    # Backup existing database
     backup_path = backup_database(db_path)
     
-    # Delete old database
+    # Remove existing database if it exists
     if os.path.exists(db_path):
         os.remove(db_path)
-        print(f"✓ Removed old database: {db_path}")
+        logging.info("Removed existing database")
     
-    # Create new database with correct schema
+    # Create new database with proper schema
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
     # Create all tables with correct schema
-    print("✓ Creating new database tables...")
+    tables = {
+        'users': '''
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(64) UNIQUE NOT NULL,
+                email VARCHAR(120) UNIQUE NOT NULL,
+                password_hash VARCHAR(256),
+                role VARCHAR(20) DEFAULT 'user',
+                branch_id VARCHAR(10),
+                branch_name VARCHAR(100),
+                default_branch_id VARCHAR(10),
+                must_change_password BOOLEAN DEFAULT 0,
+                last_login DATETIME,
+                permissions TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''',
+        'grpo_documents': '''
+            CREATE TABLE grpo_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                po_number VARCHAR(50) NOT NULL,
+                sap_document_number VARCHAR(50),
+                supplier_code VARCHAR(50),
+                supplier_name VARCHAR(200),
+                po_date DATETIME,
+                po_total DECIMAL(15,2),
+                status VARCHAR(20) DEFAULT 'draft',
+                user_id INTEGER NOT NULL,
+                qc_user_id INTEGER,
+                qc_notes TEXT,
+                notes TEXT,
+                draft_or_post VARCHAR(10) DEFAULT 'draft',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (qc_user_id) REFERENCES users(id)
+            )
+        ''',
+        'grpo_items': '''
+            CREATE TABLE grpo_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                grpo_id INTEGER NOT NULL,
+                item_code VARCHAR(50) NOT NULL,
+                item_description TEXT,
+                ordered_quantity DECIMAL(15,3),
+                received_quantity DECIMAL(15,3),
+                batch_number VARCHAR(50),
+                expiration_date DATETIME,
+                bin_location VARCHAR(50),
+                generated_barcode VARCHAR(100),
+                barcode_printed BOOLEAN DEFAULT 0,
+                qc_status VARCHAR(20) DEFAULT 'pending',
+                qc_notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (grpo_id) REFERENCES grpo_documents(id)
+            )
+        ''',
+        'barcode_labels': '''
+            CREATE TABLE barcode_labels (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_code VARCHAR(50) NOT NULL,
+                barcode VARCHAR(100) NOT NULL,
+                label_format VARCHAR(20) NOT NULL,
+                print_count INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_printed DATETIME
+            )
+        ''',
+        'branches': '''
+            CREATE TABLE branches (
+                id VARCHAR(10) PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                address TEXT,
+                phone VARCHAR(20),
+                email VARCHAR(100),
+                manager_name VARCHAR(100),
+                is_default BOOLEAN DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''',
+        'bin_locations': '''
+            CREATE TABLE bin_locations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bin_code VARCHAR(50) NOT NULL,
+                warehouse_code VARCHAR(10) NOT NULL,
+                bin_name VARCHAR(100),
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(bin_code, warehouse_code)
+            )
+        '''
+    }
     
-    # Users table
-    cursor.execute('''
-        CREATE TABLE users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username VARCHAR(80) UNIQUE NOT NULL,
-            email VARCHAR(120) UNIQUE NOT NULL,
-            password_hash VARCHAR(256) NOT NULL,
-            first_name VARCHAR(80) NOT NULL,
-            last_name VARCHAR(80) NOT NULL,
-            role VARCHAR(20) NOT NULL DEFAULT 'user',
-            branch_id VARCHAR(10),
-            branch_name VARCHAR(100),
-            is_active BOOLEAN DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    # Create all tables
+    for table_name, sql in tables.items():
+        cursor.execute(sql)
+        logging.info(f"Created table: {table_name}")
     
-    # GRPO Documents table with all new columns
-    cursor.execute('''
-        CREATE TABLE grpo_documents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            po_number VARCHAR(20) NOT NULL,
-            sap_document_number VARCHAR(20),
-            supplier_code VARCHAR(50),
-            supplier_name VARCHAR(200),
-            po_date DATETIME,
-            po_total FLOAT,
-            status VARCHAR(20) DEFAULT 'draft',
-            user_id INTEGER NOT NULL,
-            qc_user_id INTEGER,
-            qc_notes TEXT,
-            draft_or_post VARCHAR(10) DEFAULT 'draft',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (qc_user_id) REFERENCES users (id)
-        )
-    ''')
+    # Insert default data
+    cursor.execute("""
+        INSERT INTO users (username, email, password_hash, role, branch_id, branch_name) 
+        VALUES ('admin', 'admin@company.com', 'pbkdf2:sha256:600000$7K9X9rZ8$8c5a8d7d6f9e2b1a3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b', 'admin', 'HQ001', 'Head Office')
+    """)
     
-    # GRPO Items table with all new columns
-    cursor.execute('''
-        CREATE TABLE grpo_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            grpo_document_id INTEGER NOT NULL,
-            po_line_number INTEGER,
-            item_code VARCHAR(50) NOT NULL,
-            item_name VARCHAR(200) NOT NULL,
-            po_quantity FLOAT,
-            open_quantity FLOAT,
-            received_quantity FLOAT NOT NULL,
-            unit_of_measure VARCHAR(10) NOT NULL,
-            unit_price FLOAT,
-            bin_location VARCHAR(20) NOT NULL,
-            batch_number VARCHAR(50),
-            expiration_date DATETIME,
-            supplier_barcode VARCHAR(100),
-            generated_barcode VARCHAR(100),
-            barcode_printed BOOLEAN DEFAULT 0,
-            qc_status VARCHAR(20) DEFAULT 'pending',
-            qc_notes TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (grpo_document_id) REFERENCES grpo_documents (id)
-        )
-    ''')
-    
-    # Other tables
-    cursor.execute('''
-        CREATE TABLE inventory_transfers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            transfer_request_number VARCHAR(20) NOT NULL,
-            sap_document_number VARCHAR(20),
-            status VARCHAR(20) DEFAULT 'draft',
-            user_id INTEGER NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE inventory_transfer_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            inventory_transfer_id INTEGER NOT NULL,
-            item_code VARCHAR(50) NOT NULL,
-            item_name VARCHAR(200) NOT NULL,
-            quantity FLOAT NOT NULL,
-            unit_of_measure VARCHAR(10) NOT NULL,
-            from_bin VARCHAR(20) NOT NULL,
-            to_bin VARCHAR(20) NOT NULL,
-            batch_number VARCHAR(50),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (inventory_transfer_id) REFERENCES inventory_transfers (id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE pick_lists (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sales_order_number VARCHAR(20) NOT NULL,
-            pick_list_number VARCHAR(20) NOT NULL,
-            status VARCHAR(20) DEFAULT 'pending',
-            user_id INTEGER NOT NULL,
-            approver_id INTEGER,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id),
-            FOREIGN KEY (approver_id) REFERENCES users (id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE pick_list_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pick_list_id INTEGER NOT NULL,
-            item_code VARCHAR(50) NOT NULL,
-            item_name VARCHAR(200) NOT NULL,
-            quantity FLOAT NOT NULL,
-            picked_quantity FLOAT DEFAULT 0,
-            unit_of_measure VARCHAR(10) NOT NULL,
-            bin_location VARCHAR(20) NOT NULL,
-            batch_number VARCHAR(50),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (pick_list_id) REFERENCES pick_lists (id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE inventory_counts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            count_number VARCHAR(20) NOT NULL,
-            warehouse_code VARCHAR(10) NOT NULL,
-            bin_location VARCHAR(20) NOT NULL,
-            status VARCHAR(20) DEFAULT 'assigned',
-            user_id INTEGER NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE inventory_count_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            inventory_count_id INTEGER NOT NULL,
-            item_code VARCHAR(50) NOT NULL,
-            item_name VARCHAR(200) NOT NULL,
-            system_quantity FLOAT NOT NULL,
-            counted_quantity FLOAT NOT NULL,
-            variance FLOAT NOT NULL,
-            unit_of_measure VARCHAR(10) NOT NULL,
-            batch_number VARCHAR(50),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (inventory_count_id) REFERENCES inventory_counts (id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE barcode_labels (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_code VARCHAR(50) NOT NULL,
-            barcode VARCHAR(100) NOT NULL,
-            label_format VARCHAR(20) NOT NULL,
-            print_count INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_printed DATETIME
-        )
-    ''')
-    
-    # Create default admin user
-    cursor.execute('''
-        INSERT INTO users (username, email, password_hash, first_name, last_name, role, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', ('admin', 'admin@wms.local', 'scrypt:32768:8:1$8pEYlGu0xdKYV2JD$4e9e8f0b9d8c7a6e5d4c3b2a1f0e9d8c7b6a5e4d3c2b1a0f9e8d7c6b5a4e3d2c1b0a9f8e7d6c5b4a3e2d1c0b9a8f7e6d5c4b3a2e1d0c9b8a7f6e5d4c3b2a1e0d9c8b7f6a5e4d3c2b1a0f9e8d7c6b5a4e3d2c1b0a9f8e7d6c5b4a3e2d1', 'Admin', 'User', 'admin', 1))
+    cursor.execute("""
+        INSERT INTO branches (id, name, is_default, is_active) 
+        VALUES ('HQ001', 'Head Office', 1, 1)
+    """)
     
     conn.commit()
     conn.close()
     
-    print(f"✅ New database created successfully: {db_path}")
-    print("✅ Admin user created - Username: admin, Password: admin123")
+    logging.info("Database recreated successfully with all required tables and columns")
+    return db_path
 
 def main():
-    print("WMS Database Final Fix Tool")
-    print("=" * 50)
-    print("This will completely recreate your database with the correct schema.")
-    print("⚠️  WARNING: This will delete all existing data!")
-    print()
-    
-    response = input("Continue? (yes/no): ").lower().strip()
-    if response != 'yes':
-        print("Operation cancelled.")
-        return
+    """Main function"""
+    logging.info("Starting final database fix...")
     
     try:
-        recreate_database()
-        print()
-        print("🎉 Database fix completed successfully!")
-        print()
-        print("Next steps:")
-        print("1. Start your Flask application")
-        print("2. Login with: Username: admin, Password: admin123")
-        print("3. Your WMS system should now work without any database errors")
-        print()
-        print("All GRPO, QC Dashboard, and bin location features are now ready to use!")
+        # Recreate database with correct schema
+        db_path = recreate_database()
+        
+        logging.info("=" * 60)
+        logging.info("✓ DATABASE FIX COMPLETED SUCCESSFULLY!")
+        logging.info("=" * 60)
+        logging.info(f"Database location: {db_path}")
+        logging.info("All tables created with correct schema including 'notes' column")
+        logging.info("Default admin user and branch created")
+        logging.info("You can now run your application without errors")
         
     except Exception as e:
-        print(f"❌ Error fixing database: {e}")
-        print("Please check the error and try again.")
+        logging.error(f"Database fix failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -111,11 +111,14 @@ def grpo():
 def create_grpo():
     po_number = request.form['po_number']
     
-    # Check if GRPO already exists for this PO
-    existing_grpo = GRPODocument.query.filter_by(po_number=po_number).first()
-    if existing_grpo:
-        flash(f'GRPO already exists for PO {po_number}. Please use the existing GRPO (ID: {existing_grpo.id}).', 'error')
-        return redirect(url_for('grpo_detail', grpo_id=existing_grpo.id))
+    # BUSINESS LOGIC CHANGE: Allow multiple GRPOs per PO
+    # Each PO should create a NEW GRPO every time (user requirement)
+    # Comment out the existing GRPO check to allow multiple GRPOs per PO
+    
+    # existing_grpo = GRPODocument.query.filter_by(po_number=po_number).first()
+    # if existing_grpo:
+    #     flash(f'GRPO already exists for PO {po_number}. Please use the existing GRPO (ID: {existing_grpo.id}).', 'error')
+    #     return redirect(url_for('grpo_detail', grpo_id=existing_grpo.id))
     
     # Check if PO exists in SAP
     sap = SAPIntegration()

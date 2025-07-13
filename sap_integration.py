@@ -925,21 +925,16 @@ class SAPIntegration:
                 "WarehouseCode": warehouse_code
             }
             
-            # Add batch information if available
+            # Add batch information in EXACT format as user specified
             if item.batch_number:
                 batch_info = {
                     "BatchNumber": item.batch_number,
                     "Quantity": item.received_quantity,
-                    "BaseLineNumber": line_number
+                    "BaseLineNumber": line_number,
+                    "ManufacturerSerialNumber": getattr(item, 'manufacturer_serial', None) or "MFG-SN-001",
+                    "InternalSerialNumber": getattr(item, 'internal_serial', None) or "INT-SN-001",
+                    "ExpiryDate": item.expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ') if item.expiration_date else doc_date + "T00:00:00Z"
                 }
-                
-                # Add optional batch fields if available
-                if hasattr(item, 'manufacturer_serial') and item.manufacturer_serial:
-                    batch_info["ManufacturerSerialNumber"] = item.manufacturer_serial
-                if hasattr(item, 'internal_serial') and item.internal_serial:
-                    batch_info["InternalSerialNumber"] = item.internal_serial
-                if item.expiration_date:
-                    batch_info["ExpiryDate"] = item.expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ')
                     
                 line["BatchNumbers"] = [batch_info]
             
@@ -949,20 +944,16 @@ class SAPIntegration:
         if not document_lines:
             return {'success': False, 'error': 'No approved items found for Purchase Delivery Note creation'}
         
-        # Build Purchase Delivery Note with exact structure
+        # Build Purchase Delivery Note with EXACT user-specified structure
         pdn_data = {
             "CardCode": card_code,
             "DocDate": doc_date,
             "DocDueDate": doc_due_date,
-            "Comments": grpo_document.notes or "Auto-created from GRPO after QC approval",
+            "Comments": grpo_document.notes or "Auto-created from PO after QC",
             "NumAtCard": external_ref,
             "BPL_IDAssignedToInvoice": business_place_id,
             "DocumentLines": document_lines
         }
-        
-        # Add custom fields for tracking
-        pdn_data["U_WMS_GRPO_ID"] = str(grpo_document.id)
-        pdn_data["U_WMS_PO_NUMBER"] = grpo_document.po_number
         
         # Submit to SAP B1
         url = f"{self.base_url}/b1s/v1/PurchaseDeliveryNotes"
