@@ -967,8 +967,13 @@ class SAPIntegration:
         # Submit to SAP B1
         url = f"{self.base_url}/b1s/v1/PurchaseDeliveryNotes"
         
-        # Log the payload for debugging
-        logging.info(f"Creating Purchase Delivery Note with payload: {pdn_data}")
+        # Log the payload for debugging - Enhanced JSON logging
+        import json
+        logging.info("="*80)
+        logging.info("PURCHASE DELIVERY NOTE - JSON PAYLOAD")
+        logging.info("="*80)
+        logging.info(json.dumps(pdn_data, indent=2, default=str))
+        logging.info("="*80)
         
         try:
             response = self.session.post(url, json=pdn_data)

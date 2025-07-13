@@ -128,6 +128,7 @@ class GRPODocument(db.Model):
     qc_user_id = Column(Integer, ForeignKey('users.id'),
                         nullable=True)  # QC approver
     qc_notes = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)  # General notes/comments for the GRPO
     draft_or_post = Column(String(10), default='draft')  # draft, post
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime,

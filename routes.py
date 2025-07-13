@@ -943,8 +943,130 @@ def scan_barcode():
 @login_required
 def generate_barcode_api():
     """Generate new barcode for item"""
-    data = request.get_json()
-    item_code = data.get('item_code')
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        item_id = data.get('item_id')
+        item_code = data.get('item_code')
+        
+        if not item_id or not item_code:
+            return jsonify({'error': 'item_id and item_code are required'}), 400
+        
+        # Generate WMS format barcode
+        import secrets
+        random_suffix = secrets.token_hex(4).upper()
+        barcode = f"WMS-{item_code}-{random_suffix}"
+        
+        # Update GRPO item with generated barcode
+        grpo_item = GRPOItem.query.get(item_id)
+        if not grpo_item:
+            return jsonify({'error': 'GRPO item not found'}), 404
+        
+        grpo_item.generated_barcode = barcode
+        grpo_item.barcode_printed = False
+        db.session.commit()
+        
+        # Also save to barcode labels table for reprinting
+        label = BarcodeLabel(
+            item_code=item_code,
+            barcode=barcode,
+            label_format='standard',
+            print_count=0
+        )
+        db.session.add(label)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'barcode': barcode,
+            'message': f'Barcode {barcode} generated successfully'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error generating barcode: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/print_barcode', methods=['POST'])
+@login_required
+def print_barcode_api():
+    """Print barcode and mark as printed"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        barcode = data.get('barcode')
+        item_id = data.get('item_id')
+        
+        if not barcode:
+            return jsonify({'error': 'barcode is required'}), 400
+        
+        # Update GRPO item print status if item_id provided
+        if item_id:
+            grpo_item = GRPOItem.query.get(item_id)
+            if grpo_item and grpo_item.generated_barcode == barcode:
+                grpo_item.barcode_printed = True
+                db.session.commit()
+        
+        # Update barcode label print count
+        label = BarcodeLabel.query.filter_by(barcode=barcode).first()
+        if label:
+            label.print_count += 1
+            label.last_printed = datetime.utcnow()
+            db.session.commit()
+        
+        # In a real system, this would send to a label printer
+        # For now, we'll return success with barcode data
+        return jsonify({
+            'success': True,
+            'message': f'Printing barcode: {barcode}',
+            'barcode': barcode
+        })
+        
+    except Exception as e:
+        logging.error(f"Error printing barcode: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/post_grpo_to_sap/<int:grpo_id>', methods=['POST'])
+@login_required
+def post_grpo_to_sap_manual(grpo_id):
+    """Manually post approved GRPO to SAP B1"""
+    try:
+        # Get GRPO document
+        grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+        
+        # Check if user has permission to post
+        if current_user.role not in ['admin', 'manager']:
+            flash('Access denied. Only managers and admins can post to SAP B1.', 'error')
+            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        
+        # Check if GRPO is approved
+        if grpo_doc.status != 'approved':
+            flash('GRPO must be approved before posting to SAP B1.', 'error')
+            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        
+        # Check if already posted
+        if grpo_doc.sap_document_number:
+            flash(f'GRPO already posted to SAP B1 as document {grpo_doc.sap_document_number}.', 'warning')
+            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        
+        # Post to SAP B1
+        sap = SAPIntegration()
+        result = sap.post_grpo_to_sap(grpo_doc)
+        
+        if result.get('success'):
+            flash(f'GRPO successfully posted to SAP B1 as Purchase Delivery Note {result.get("sap_document_number")}.', 'success')
+        else:
+            flash(f'Error posting GRPO to SAP B1: {result.get("error")}', 'error')
+        
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        
+    except Exception as e:
+        logging.error(f"Error in post_grpo_to_sap_manual: {str(e)}")
+        flash(f'Error posting GRPO to SAP B1: {str(e)}', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
     
     if not item_code:
         return jsonify({'error': 'Item code is required'}), 400
@@ -1062,29 +1184,6 @@ def sync_sap_data():
     
     return redirect(url_for('dashboard'))
 
-@app.route('/post-grpo-to-sap/<int:grpo_id>', methods=['POST'])
-@login_required
-def post_grpo_to_sap_manual(grpo_id):
-    """Manually post approved GRPO to SAP B1"""
-    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
-    
-    if current_user.role not in ['admin', 'manager']:
-        flash('You do not have permission to post to SAP', 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
-    
-    if grpo_doc.status != 'approved':
-        flash('GRPO must be approved before posting to SAP', 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
-    
-    from sap_integration import SAPIntegration
-    sap_integration = SAPIntegration()
-    result = sap_integration.post_grpo_to_sap(grpo_doc)
-    
-    if result.get('success'):
-        flash(f'GRPO posted to SAP B1 successfully! SAP Document Number: {result.get("sap_document_number")}', 'success')
-    else:
-        flash(f'Failed to post GRPO to SAP B1: {result.get("error")}', 'error')
-    
-    return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+# Duplicate route removed - using the one defined earlier
 
 # Default admin user is created in app.py during initialization
