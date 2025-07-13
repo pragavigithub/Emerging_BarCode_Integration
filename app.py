@@ -24,9 +24,37 @@ app.secret_key = os.environ.get(
     "SESSION_SECRET") or "dev-secret-key-change-in-production"
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure database - handle both Replit and local environments
+# Configure database - handle MSSQL, PostgreSQL, and SQLite
+mssql_server = os.environ.get("MSSQL_SERVER")
+mssql_database = os.environ.get("MSSQL_DATABASE")
+mssql_username = os.environ.get("MSSQL_USERNAME")
+mssql_password = os.environ.get("MSSQL_PASSWORD")
 database_url = os.environ.get("DATABASE_URL")
-if database_url:
+
+if mssql_server and mssql_database and mssql_username and mssql_password:
+    # MSSQL Server connection
+    from urllib.parse import quote_plus
+    
+    # Encode credentials for URL
+    encoded_username = quote_plus(mssql_username)
+    encoded_password = quote_plus(mssql_password)
+    encoded_server = quote_plus(mssql_server)
+    encoded_database = quote_plus(mssql_database)
+    
+    # Build MSSQL connection string
+    mssql_url = f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
+    
+    app.config["SQLALCHEMY_DATABASE_URI"] = mssql_url
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_timeout": 30
+    }
+    logging.info(f"Using MSSQL database: {mssql_server}/{mssql_database}")
+    
+elif database_url:
     # Replit environment with PostgreSQL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -38,7 +66,6 @@ if database_url:
     logging.info("Using PostgreSQL database")
 else:
     # Local development - create SQLite database with proper path handling
-    import os
     import tempfile
     
     # Try to create instance directory in current working directory
@@ -63,10 +90,11 @@ else:
         db_path = os.path.join(temp_dir, "wms.db")
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
         logging.info(f"Using SQLite database in temp directory: {db_path}")
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
+        
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
 
 # Initialize extensions with app
 db.init_app(app)

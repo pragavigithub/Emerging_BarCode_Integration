@@ -81,9 +81,10 @@
                                     <th>Item Code</th>
                                     <th>Description</th>
                                     <th>Quantity</th>
+                                    <th>Open Qty</th>
                                     <th>UoM</th>
                                     <th>Price</th>
-                                    <th>Total</th>
+                                    <th>Line Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -93,9 +94,19 @@
                                     <td><strong>{{ item.ItemCode or item.item_code or 'N/A' }}</strong></td>
                                     <td>{{ item.ItemName or item.item_name or item.Description or 'N/A' }}</td>
                                     <td>{{ item.Quantity or item.quantity or 0 }}</td>
+                                    <td>{{ item.OpenQuantity or item.open_quantity or 0 }}</td>
                                     <td>{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or 'EA' }}</td>
                                     <td>${{ "%.2f"|format(item.Price or item.price or 0) }}</td>
-                                    <td>${{ "%.2f"|format((item.Quantity or item.quantity or 0) * (item.Price or item.price or 0)) }}</td>
+                                    <td>
+                                        {% set line_status = item.LineStatus or item.line_status or 'Unknown' %}
+                                        {% if line_status == 'bost_Open' %}
+                                            <span class="badge bg-success">Open</span>
+                                        {% elif line_status == 'bost_Close' %}
+                                            <span class="badge bg-danger">Closed</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ line_status }}</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% set received_items = grpo_doc.items|selectattr('po_line_number', 'equalto', item.LineNum)|selectattr('item_code', 'equalto', item.ItemCode or item.item_code)|list %}
                                         {% set total_received = received_items|sum(attribute='received_quantity') %}

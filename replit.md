@@ -190,3 +190,11 @@ Changelog:
   - Implemented proper BaseType 22 (Purchase Order) referencing in delivery notes
   - Enhanced batch and bin location mapping for inventory accuracy
   - Added proper reference fields (GRPO ID, PO number) for audit trail
+- July 13, 2025. Enhanced GRPO Creation and MSSQL Database Support:
+  - Added PO line status validation: Only allows GRPO creation for POs with "bost_Open" status
+  - Implemented duplicate GRPO prevention: Checks for existing GRPO before creating new one
+  - Added MSSQL database connection support with proper environment variable configuration
+  - Enhanced GRPO detail template to display PO line status (Open/Closed) and open quantities
+  - Created MSSQL setup script (setup_mssql_env.py) for easy database configuration
+  - Improved database connection priority: MSSQL > PostgreSQL > SQLite fallback
+  - Added comprehensive validation for PO open quantities before allowing item additions

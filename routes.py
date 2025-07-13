@@ -111,12 +111,35 @@ def grpo():
 def create_grpo():
     po_number = request.form['po_number']
     
+    # Check if GRPO already exists for this PO
+    existing_grpo = GRPODocument.query.filter_by(po_number=po_number).first()
+    if existing_grpo:
+        flash(f'GRPO already exists for PO {po_number}. Please use the existing GRPO (ID: {existing_grpo.id}).', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=existing_grpo.id))
+    
     # Check if PO exists in SAP
     sap = SAPIntegration()
     po_data = sap.get_purchase_order(po_number)
     
     if not po_data:
         flash('Purchase Order not found in SAP B1.', 'error')
+        return redirect(url_for('grpo'))
+    
+    # Check if PO has open lines
+    document_lines = po_data.get('DocumentLines', [])
+    has_open_lines = False
+    
+    for line in document_lines:
+        line_status = line.get('LineStatus', '')
+        open_quantity = line.get('OpenQuantity', 0)
+        
+        # Check if line is open (not closed) and has open quantity
+        if line_status == 'bost_Open' and open_quantity > 0:
+            has_open_lines = True
+            break
+    
+    if not has_open_lines:
+        flash('Purchase Order has no open lines available for receipt. All lines are either closed or fully received.', 'error')
         return redirect(url_for('grpo'))
     
     # Parse SAP date safely (handles both ISO format and simple date format)
