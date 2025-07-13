@@ -126,7 +126,8 @@ class SAPIntegration:
                         'OpenQuantity': 100,
                         'Price': 50.00,
                         'UoMCode': 'EA',
-                        'WarehouseCode': 'WH01'
+                        'WarehouseCode': 'WH01',
+                        'LineStatus': 'bost_Open'
                     },
                     {
                         'LineNum': 1,
@@ -136,7 +137,8 @@ class SAPIntegration:
                         'OpenQuantity': 30,
                         'Price': 200.00,
                         'UoMCode': 'KGS',
-                        'WarehouseCode': 'WH01'
+                        'WarehouseCode': 'WH01',
+                        'LineStatus': 'bost_Open'
                     }
                 ]
             }
@@ -168,7 +170,8 @@ class SAPIntegration:
                         'OpenQuantity': 100,
                         'Price': 50.00,
                         'UoMCode': 'EA',
-                        'WarehouseCode': 'WH01'
+                        'WarehouseCode': 'WH01',
+                        'LineStatus': 'bost_Open'
                     }
                 ]
             }

@@ -129,17 +129,33 @@ def create_grpo():
     document_lines = po_data.get('DocumentLines', [])
     has_open_lines = False
     
+    logging.info(f"Validating PO {po_number}: Found {len(document_lines)} line items")
+    
     for line in document_lines:
         line_status = line.get('LineStatus', '')
         open_quantity = line.get('OpenQuantity', 0)
+        quantity = line.get('Quantity', 0)
+        item_code = line.get('ItemCode', 'Unknown')
+        
+        logging.info(f"Line {line.get('LineNum', '?')} - Item: {item_code}, Status: '{line_status}', OpenQty: {open_quantity}, Qty: {quantity}")
         
         # Check if line is open (not closed) and has open quantity
-        if line_status == 'bost_Open' and open_quantity > 0:
+        # Also handle cases where LineStatus might be missing (offline mode)
+        # In offline mode, assume lines are open if they have positive open quantity
+        is_line_open = (line_status == 'bost_Open' or 
+                       (line_status == '' and open_quantity > 0) or
+                       (line_status == '' and quantity > 0))
+        
+        if is_line_open and open_quantity > 0:
             has_open_lines = True
+            logging.info(f"Found open line: {item_code} with open quantity {open_quantity}")
             break
     
     if not has_open_lines:
-        flash('Purchase Order has no open lines available for receipt. All lines are either closed or fully received.', 'error')
+        if document_lines:
+            flash('Purchase Order has no open lines available for receipt. All lines are either closed or fully received.', 'error')
+        else:
+            flash('Purchase Order has no line items.', 'error')
         return redirect(url_for('grpo'))
     
     # Parse SAP date safely (handles both ISO format and simple date format)
