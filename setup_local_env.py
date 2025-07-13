@@ -80,8 +80,8 @@ SESSION_SECRET=your-secret-key-change-in-production
 # SAP B1 Configuration
 SAP_B1_SERVER=https://192.168.1.5:50000
 SAP_B1_USERNAME=manager
-SAP_B1_PASSWORD=Ea@12345
-SAP_B1_COMPANY_DB=Test_Hutchinson
+SAP_B1_PASSWORD=1422
+SAP_B1_COMPANY_DB=EINV-TESTDB-LIVE-HUST
 """
     
     with open('.env', 'w') as f:
