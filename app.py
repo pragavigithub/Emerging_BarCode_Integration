@@ -41,79 +41,89 @@ mssql_username = os.environ.get("MSSQL_USERNAME")
 mssql_password = os.environ.get("MSSQL_PASSWORD")
 database_url = os.environ.get("DATABASE_URL")
 
-if mssql_server and mssql_database and mssql_username and mssql_password:
-    # MSSQL Server connection with enhanced error handling
-    from urllib.parse import quote_plus
+# Database connection priority: MSSQL > PostgreSQL > SQLite
+database_configured = False
+
+# Try MSSQL first (only if all required variables are set and not empty)
+if (mssql_server and mssql_server.strip() and 
+    mssql_database and mssql_database.strip() and 
+    mssql_username and mssql_username.strip() and 
+    mssql_password and mssql_password.strip()):
     
-    try:
-        # Encode credentials for URL
-        encoded_username = quote_plus(mssql_username)
-        encoded_password = quote_plus(mssql_password)
-        encoded_server = quote_plus(mssql_server)
-        encoded_database = quote_plus(mssql_database)
+    # Check if we're in a Windows environment (required for MSSQL)
+    import platform
+    if platform.system() == "Windows":
+        from urllib.parse import quote_plus
         
-        # Try multiple connection configurations
-        connection_configs = [
-            # Configuration 1: TCP/IP connection
-            {
-                'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes",
-                'description': 'ODBC Driver 17 with TCP/IP'
-            },
-            # Configuration 2: Named Pipes disabled
-            {
-                'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&Trusted_Connection=no",
-                'description': 'ODBC Driver 17 without Named Pipes'
-            },
-            # Configuration 3: SQL Server driver fallback
-            {
-                'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=SQL+Server&TrustServerCertificate=yes",
-                'description': 'SQL Server driver'
-            }
-        ]
-        
-        mssql_connected = False
-        for config in connection_configs:
-            try:
-                logging.info(f"Trying MSSQL connection: {config['description']}")
-                app.config["SQLALCHEMY_DATABASE_URI"] = config['url']
-                app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-                    "pool_recycle": 300,
-                    "pool_pre_ping": True,
-                    "pool_size": 5,
-                    "max_overflow": 10,
-                    "pool_timeout": 10,
-                    "connect_args": {
-                        "timeout": 10,
-                        "autocommit": False
-                    }
-                }
-                
-                # Test the connection
-                from sqlalchemy import create_engine, text
-                test_engine = create_engine(config['url'])
-                with test_engine.connect() as conn:
-                    conn.execute(text("SELECT 1"))
-                    logging.info(f"✅ MSSQL connection successful: {mssql_server}/{mssql_database}")
-                    mssql_connected = True
-                    break
-                    
-            except Exception as e:
-                logging.warning(f"❌ MSSQL connection failed with {config['description']}: {e}")
-                continue
-        
-        if not mssql_connected:
-            logging.error(f"❌ All MSSQL connection attempts failed for {mssql_server}/{mssql_database}")
-            logging.info("Falling back to available database...")
-            # Clear MSSQL config and fall through to next option
-            mssql_server = None
+        try:
+            # Encode credentials for URL
+            encoded_username = quote_plus(mssql_username)
+            encoded_password = quote_plus(mssql_password)
+            encoded_server = quote_plus(mssql_server)
+            encoded_database = quote_plus(mssql_database)
             
-    except Exception as e:
-        logging.error(f"MSSQL connection error: {e}")
-        logging.info("Falling back to available database...")
-        # Clear MSSQL config and fall through to next option
-        mssql_server = None
-        
-elif database_url:
+            # Try multiple connection configurations
+            connection_configs = [
+                # Configuration 1: TCP/IP connection
+                {
+                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes",
+                    'description': 'ODBC Driver 17 with TCP/IP'
+                },
+                # Configuration 2: Named Pipes disabled
+                {
+                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&Trusted_Connection=no",
+                    'description': 'ODBC Driver 17 without Named Pipes'
+                },
+                # Configuration 3: SQL Server driver fallback
+                {
+                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=SQL+Server&TrustServerCertificate=yes",
+                    'description': 'SQL Server driver'
+                }
+            ]
+            
+            for config in connection_configs:
+                try:
+                    logging.info(f"Trying MSSQL connection: {config['description']}")
+                    
+                    # Test the connection first
+                    from sqlalchemy import create_engine, text
+                    test_engine = create_engine(config['url'], pool_timeout=5)
+                    with test_engine.connect() as conn:
+                        conn.execute(text("SELECT 1"))
+                        # Connection successful, configure Flask
+                        app.config["SQLALCHEMY_DATABASE_URI"] = config['url']
+                        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+                            "pool_recycle": 300,
+                            "pool_pre_ping": True,
+                            "pool_size": 5,
+                            "max_overflow": 10,
+                            "pool_timeout": 10,
+                            "connect_args": {
+                                "timeout": 10,
+                                "autocommit": False
+                            }
+                        }
+                        logging.info(f"✅ MSSQL connection successful: {mssql_server}/{mssql_database}")
+                        database_configured = True
+                        break
+                        
+                except Exception as e:
+                    logging.warning(f"❌ MSSQL connection failed with {config['description']}: {e}")
+                    continue
+            
+            if not database_configured:
+                logging.error(f"❌ All MSSQL connection attempts failed for {mssql_server}/{mssql_database}")
+                logging.info("Falling back to next database option...")
+                
+        except Exception as e:
+            logging.error(f"MSSQL connection error: {e}")
+            logging.info("Falling back to next database option...")
+    else:
+        logging.info("MSSQL configuration detected but not supported on this platform (non-Windows)")
+        logging.info("Falling back to next database option...")
+
+# Try PostgreSQL if MSSQL failed or not configured
+if not database_configured and database_url:
     # Replit environment with PostgreSQL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -123,7 +133,10 @@ elif database_url:
         "max_overflow": 20
     }
     logging.info("Using PostgreSQL database")
-else:
+    database_configured = True
+
+# Fall back to SQLite if no other database is configured
+if not database_configured:
     # Local development - create SQLite database with proper path handling
     import tempfile
     
