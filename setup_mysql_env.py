@@ -27,7 +27,7 @@ MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_DATABASE=wms_db
 MYSQL_USERNAME=root
-MYSQL_PASSWORD=your_mysql_password
+MYSQL_PASSWORD=root@123
 
 # Alternative MySQL configurations:
 # For remote MySQL server:
@@ -45,8 +45,8 @@ SESSION_SECRET=mysql-dev-secret-key-{computer_name}
 # Update these when you have actual SAP B1 server
 SAP_B1_SERVER=https://192.168.1.5:50000
 SAP_B1_USERNAME=manager
-SAP_B1_PASSWORD=Ea@12345
-SAP_B1_COMPANY_DB=Test_Hutchinson
+SAP_B1_PASSWORD=1422
+SAP_B1_COMPANY_DB=EINV-TESTDB-LIVE-HUST
 
 # Development Settings
 FLASK_ENV=development
