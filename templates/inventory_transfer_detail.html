@@ -45,6 +45,8 @@
                             <p><strong>Transfer Request:</strong> {{ transfer.transfer_request_number }}</p>
                             <p><strong>SAP Document:</strong> {{ transfer.sap_document_number or 'Not assigned' }}</p>
                             <p><strong>Status:</strong> {{ transfer.status.title() }}</p>
+                            <p><strong>From Warehouse:</strong> {{ transfer.from_warehouse or 'Not specified' }}</p>
+                            <p><strong>To Warehouse:</strong> {{ transfer.to_warehouse or 'Not specified' }}</p>
                         </div>
                         <div class="col-md-6">
                             <p><strong>Created By:</strong> {{ transfer.user.first_name }} {{ transfer.user.last_name }}</p>
@@ -82,8 +84,8 @@
                                     <th>Description</th>
                                     <th>Quantity</th>
                                     <th>UoM</th>
-                                    <th>From Bin</th>
-                                    <th>To Bin</th>
+                                    <th>From Warehouse/Bin</th>
+                                    <th>To Warehouse/Bin</th>
                                     <th>Batch</th>
                                     <th>Actions</th>
                                 </tr>
@@ -95,8 +97,14 @@
                                     <td>{{ item.item_name }}</td>
                                     <td>{{ item.quantity }}</td>
                                     <td>{{ item.unit_of_measure }}</td>
-                                    <td>{{ item.from_bin }}</td>
-                                    <td>{{ item.to_bin }}</td>
+                                    <td>
+                                        {% set from_warehouse = item.from_bin.split('-')[0] if item.from_bin and '-' in item.from_bin else item.from_bin[:4] if item.from_bin else 'N/A' %}
+                                        <strong>{{ from_warehouse }}</strong> / {{ item.from_bin or 'N/A' }}
+                                    </td>
+                                    <td>
+                                        {% set to_warehouse = item.to_bin.split('-')[0] if item.to_bin and '-' in item.to_bin else item.to_bin[:4] if item.to_bin else 'N/A' %}
+                                        <strong>{{ to_warehouse }}</strong> / {{ item.to_bin or 'N/A' }}
+                                    </td>
                                     <td>{{ item.batch_number or '-' }}</td>
                                     <td>
                                         <button class="btn btn-sm btn-danger" onclick="removeItem({{ item.id }})">

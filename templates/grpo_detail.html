@@ -352,8 +352,8 @@
                     <div class="mb-3">
                         <label for="warehouse_code" class="form-label">Warehouse Code <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="warehouse_code" name="warehouse_code" 
-                               value="WH001" placeholder="Enter warehouse code (e.g., WH001)" required>
-                        <div class="form-text">Enter the warehouse code where items will be stored</div>
+                               value="WH001" placeholder="Warehouse code from SAP B1" readonly required>
+                        <div class="form-text">Warehouse code is read-only (synced from SAP B1)</div>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
@@ -419,22 +419,65 @@ function showAddItemModal() {
 
 // Show JSON Preview for SAP B1 posting
 function showJsonPreview(grpoId) {
+    console.log('🔍 Fetching JSON preview for GRPO ID:', grpoId);
+    
     fetch(`/api/grpo/${grpoId}/preview_json`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('📡 Response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('📄 JSON Preview Response:', data);
+            
             const jsonContent = document.getElementById('jsonContent');
             if (data.success) {
-                jsonContent.textContent = JSON.stringify(data.json_data, null, 2);
+                const formattedJson = JSON.stringify(data.json_data, null, 2);
+                jsonContent.textContent = formattedJson;
+                
+                console.log('✅ JSON Structure for SAP B1:');
+                console.log('📊 PO Number:', data.po_number);
+                console.log('📋 Total Lines:', data.total_lines);
+                console.log('🏗️ Complete JSON Structure:');
+                console.log(formattedJson);
+                
+                // Also log individual components for debugging
+                if (data.json_data) {
+                    console.log('🏢 Card Code:', data.json_data.CardCode);
+                    console.log('📅 Doc Date:', data.json_data.DocDate);
+                    console.log('🏪 Business Place ID:', data.json_data.BPL_IDAssignedToInvoice);
+                    console.log('📦 Document Lines Count:', data.json_data.DocumentLines?.length || 0);
+                    
+                    if (data.json_data.DocumentLines) {
+                        data.json_data.DocumentLines.forEach((line, index) => {
+                            console.log(`📝 Line ${index + 1}:`, {
+                                ItemCode: line.ItemCode,
+                                Quantity: line.Quantity,
+                                WarehouseCode: line.WarehouseCode,
+                                BaseType: line.BaseType,
+                                BaseEntry: line.BaseEntry,
+                                BaseLine: line.BaseLine
+                            });
+                        });
+                    }
+                }
             } else {
-                jsonContent.textContent = `Error generating JSON preview: ${data.error}`;
+                const errorMsg = `❌ Error generating JSON preview: ${data.error}`;
+                jsonContent.textContent = errorMsg;
+                console.error('❌ JSON Preview Error:', data.error);
             }
+            
             const modal = new bootstrap.Modal(document.getElementById('jsonPreviewModal'));
             modal.show();
         })
         .catch(error => {
-            console.error('Error fetching JSON preview:', error);
+            console.error('🚨 Error fetching JSON preview:', error);
             const jsonContent = document.getElementById('jsonContent');
-            jsonContent.textContent = `Error fetching JSON preview: ${error.message}`;
+            const errorMsg = `🚨 Network/Server Error: ${error.message}`;
+            jsonContent.textContent = errorMsg;
+            
             const modal = new bootstrap.Modal(document.getElementById('jsonPreviewModal'));
             modal.show();
         });
