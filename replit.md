@@ -237,3 +237,12 @@ Changelog:
   - Enhanced error handling and logging for Purchase Delivery Note creation process
   - Added comprehensive field mapping: CardCode, DocDate, DocDueDate, Comments, NumAtCard, BPL_IDAssignedToInvoice
   - Created complete document line structure with proper quantity and warehouse code extraction
+- July 13, 2025. Database Schema Migration and Enhanced Barcode Functionality:
+  - Fixed missing 'notes' attribute in GRPODocument model with PostgreSQL database migration
+  - Enhanced JSON logging for SAP API calls with detailed formatting for debugging
+  - Implemented complete barcode generation and printing API endpoints
+  - Added functional JavaScript integration for barcode generation and printing in GRPO templates
+  - Created MySQL-compatible database migration script (migrate_database_mysql.py)
+  - Fixed warehouse code display issues in GRPO screens
+  - Resolved duplicate route definitions and application startup errors
+  - Enhanced WMS barcode format: WMS-ITEMCODE-RANDOMHEX with proper database tracking
