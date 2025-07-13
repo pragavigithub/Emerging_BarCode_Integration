@@ -133,7 +133,8 @@ def create_grpo():
     
     for line in document_lines:
         line_status = line.get('LineStatus', '')
-        open_quantity = line.get('OpenQuantity', 0)
+        # Check both possible field names for open quantity
+        open_quantity = line.get('RemainingOpenQuantity', line.get('OpenQuantity', 0))
         quantity = line.get('Quantity', 0)
         item_code = line.get('ItemCode', 'Unknown')
         
