@@ -309,3 +309,12 @@ Changelog:
   - Added validation API endpoint (/api/validate_transfer_request/) for testing
   - Resolved missing warehouse columns issue for local development environments
   - PostgreSQL database confirmed working with all required tables and columns
+- July 14, 2025. Fixed Inventory Transfer JSON Structure for SAP B1 Integration:
+  - Corrected inventory transfer JSON structure to use StockTransferLines instead of DocumentLines
+  - Added bin AbsEntry lookup functionality for proper bin allocation in SAP B1
+  - Enhanced warehouse code extraction from bin locations for improved accuracy
+  - Implemented StockTransferLinesBinAllocations with proper BinAbsEntry mapping
+  - Added comprehensive logging for inventory transfer API calls and responses
+  - Fixed SAP B1 API compliance to prevent "Data DocumentLines not found" errors
+  - Enhanced batch number handling in stock transfer lines
+  - Completed migration from Replit Agent to Replit environment successfully

@@ -401,6 +401,24 @@ class SAPIntegration:
             logging.error(f"Error creating GRPO in SAP B1: {str(e)}")
             return {'success': False, 'error': str(e)}
     
+    def get_bin_abs_entry(self, bin_code, warehouse_code):
+        """Get bin AbsEntry from SAP B1 for bin allocation"""
+        if not self.ensure_logged_in():
+            return None
+            
+        try:
+            url = f"{self.base_url}/b1s/v1/BinLocations?$filter=BinCode eq '{bin_code}' and Warehouse eq '{warehouse_code}'"
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                bins = response.json().get('value', [])
+                if bins:
+                    return bins[0].get('AbsEntry')
+            return None
+        except Exception as e:
+            logging.error(f"Error getting bin AbsEntry for {bin_code}: {str(e)}")
+            return None
+
     def create_inventory_transfer(self, transfer_document):
         """Create Inventory Transfer in SAP B1"""
         if not self.ensure_logged_in():
@@ -408,44 +426,81 @@ class SAPIntegration:
             
         url = f"{self.base_url}/b1s/v1/StockTransfers"
         
-        # Build document lines
-        document_lines = []
+        # Build stock transfer lines with correct structure
+        stock_transfer_lines = []
         for item in transfer_document.items:
+            # Extract warehouse codes from bin locations
+            from_warehouse = item.from_bin.split('-')[0] if '-' in item.from_bin else item.from_bin[:2]
+            to_warehouse = item.to_bin.split('-')[0] if '-' in item.to_bin else item.to_bin[:2]
+            
             line = {
                 "ItemCode": item.item_code,
                 "Quantity": item.quantity,
-                "FromWarehouseCode": item.from_bin[:2],  # Assuming first 2 chars are warehouse
-                "ToWarehouseCode": item.to_bin[:2],
-                "FromBinCode": item.from_bin,
-                "ToBinCode": item.to_bin
+                "FromWarehouseCode": from_warehouse,
+                "WarehouseCode": to_warehouse  # Target warehouse
             }
+            
+            # Add batch numbers if present
             if item.batch_number:
                 line["BatchNumbers"] = [{
                     "BatchNumber": item.batch_number,
                     "Quantity": item.quantity
                 }]
-            document_lines.append(line)
+            
+            # Add bin allocations
+            bin_allocations = []
+            
+            # Get bin AbsEntry for from bin
+            from_bin_abs = self.get_bin_abs_entry(item.from_bin, from_warehouse)
+            if from_bin_abs:
+                bin_allocations.append({
+                    "BinAbsEntry": from_bin_abs,
+                    "Quantity": item.quantity
+                })
+            
+            # Get bin AbsEntry for to bin
+            to_bin_abs = self.get_bin_abs_entry(item.to_bin, to_warehouse)
+            if to_bin_abs:
+                bin_allocations.append({
+                    "BinAbsEntry": to_bin_abs,
+                    "Quantity": item.quantity
+                })
+            
+            if bin_allocations:
+                line["StockTransferLinesBinAllocations"] = bin_allocations
+            
+            stock_transfer_lines.append(line)
         
         transfer_data = {
-            "DocumentLines": document_lines,
-            "Comments": f"Created from WMS Transfer {transfer_document.id}"
+            "DocDate": datetime.now().strftime('%Y-%m-%d'),
+            "Comments": f"Created from WMS Transfer {transfer_document.id}",
+            "StockTransferLines": stock_transfer_lines
         }
+        
+        # Log the JSON payload for debugging
+        logging.info(f"📤 Sending inventory transfer to SAP B1:")
+        logging.info(f"JSON payload: {json.dumps(transfer_data, indent=2)}")
         
         try:
             response = self.session.post(url, json=transfer_data)
+            logging.info(f"📡 SAP B1 response status: {response.status_code}")
+            
             if response.status_code == 201:
                 result = response.json()
+                logging.info(f"✅ Inventory transfer created successfully: {result.get('DocNum')}")
                 return {
                     'success': True,
                     'document_number': result.get('DocNum')
                 }
             else:
+                error_msg = f"SAP B1 error: {response.text}"
+                logging.error(f"❌ Failed to create inventory transfer: {error_msg}")
                 return {
                     'success': False,
-                    'error': f"SAP B1 error: {response.text}"
+                    'error': error_msg
                 }
         except Exception as e:
-            logging.error(f"Error creating inventory transfer in SAP B1: {str(e)}")
+            logging.error(f"❌ Error creating inventory transfer in SAP B1: {str(e)}")
             return {'success': False, 'error': str(e)}
     
     def create_inventory_counting(self, count_document):
