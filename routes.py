@@ -1098,26 +1098,31 @@ def qc_dashboard():
 def validate_transfer_request():
     """Validate transfer request number from SAP B1"""
     data = request.get_json()
-    transfer_request = data.get('transfer_request')
+    request_number = data.get('request_number')
     
-    if not transfer_request:
+    if not request_number:
         return jsonify({'valid': False, 'error': 'Transfer request number is required'})
     
     try:
         # Check SAP B1 for the transfer request
         sap = SAPIntegration()
-        transfer_data = sap.get_inventory_transfer_request(transfer_request)
+        transfer_data = sap.get_inventory_transfer_request(request_number)
         
         if transfer_data:
+            items_count = len(transfer_data.get('StockTransferLines', []))
             return jsonify({
                 'valid': True,
-                'transfer_data': transfer_data
+                'transfer_data': transfer_data,
+                'items_count': items_count,
+                'from_warehouse': transfer_data.get('FromWarehouse', ''),
+                'to_warehouse': transfer_data.get('ToWarehouse', ''),
+                'status': transfer_data.get('DocStatus', '')
             })
         else:
             return jsonify({'valid': False, 'error': 'Transfer request not found in SAP B1'})
     except Exception as e:
         logging.error(f"Error validating transfer request: {str(e)}")
-        return jsonify({'valid': False, 'error': 'Error validating transfer request'})
+        return jsonify({'valid': False, 'error': f'Error validating transfer request: {str(e)}'})
 
 @app.route('/api/bins', methods=['GET'])
 @login_required
@@ -1279,6 +1284,12 @@ def preview_grpo_json(grpo_id):
             "DocumentLines": document_lines
         }
         
+        # Log the JSON structure for debugging
+        logging.info(f"🔍 JSON Preview Generated for GRPO {grpo_id}:")
+        logging.info(f"📊 PO Number: {grpo_doc.po_number}")
+        logging.info(f"📋 Total Lines: {len(document_lines)}")
+        logging.info(f"🏗️ JSON Structure: {json.dumps(pdn_data, indent=2)}")
+        
         return jsonify({
             'success': True,
             'json_data': pdn_data,
@@ -1288,5 +1299,7 @@ def preview_grpo_json(grpo_id):
         })
         
     except Exception as e:
-        logging.error(f"Error generating JSON preview: {str(e)}")
+        logging.error(f"❌ Error generating JSON preview: {str(e)}")
+        import traceback
+        logging.error(f"🔍 Full traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)})
