@@ -277,3 +277,15 @@ Changelog:
   - Improved "From Warehouse/Bin" and "To Warehouse/Bin" visibility in transfer items
   - Enhanced error handling and debugging capabilities for SAP B1 integration
   - All functionality verified and working correctly on Replit platform
+- July 14, 2025. Enhanced GRPO Item Management with Serial/Batch Support:
+  - Enhanced GRPO add item modal with improved UOM display (Unit of Measure instead of UoM)
+  - Added warehouse code visibility with editable capability and bin location auto-population
+  - Implemented serial/batch management indicators based on SAP B1 item master data
+  - Added visual badges (Serial/Batch) on Add buttons for items requiring special tracking
+  - Enhanced item management type detection from Purchase Order data
+  - Added warehouse edit functionality with automatic bin location generation
+  - Integrated serial number and batch number fields with validation
+  - Added PostgreSQL database migration for serial_number column
+  - Enhanced form validation to require serial/batch numbers for managed items
+  - Improved user experience with contextual alerts and field descriptions
+  - Fixed database schema compatibility and migration issues for production deployment
