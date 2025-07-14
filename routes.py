@@ -1238,13 +1238,19 @@ def preview_grpo_json(grpo_id):
         if not po_data:
             return jsonify({'success': False, 'error': 'PO data not found'})
         
-        # Build the Purchase Delivery Note JSON structure
-        from datetime import datetime
-        doc_date = datetime.utcnow().strftime('%Y-%m-%d')
-        doc_due_date = doc_date
-        
+        # Build the Purchase Delivery Note JSON structure using PO dates
         card_code = po_data.get('CardCode')
         po_doc_entry = po_data.get('DocEntry')
+        
+        # Use PO dates in correct format (YYYY-MM-DD, not with time)
+        doc_date = po_data.get('DocDate', '2024-02-24')
+        doc_due_date = po_data.get('DocDueDate', '2024-03-05')
+        
+        # Ensure dates are in YYYY-MM-DD format (remove time if present)
+        if 'T' in doc_date:
+            doc_date = doc_date.split('T')[0]
+        if 'T' in doc_due_date:
+            doc_due_date = doc_due_date.split('T')[0]
         
         # Generate external reference
         external_ref = sap.generate_external_reference_number(grpo_doc)
@@ -1277,8 +1283,15 @@ def preview_grpo_json(grpo_id):
             if po_line_num is None:
                 continue
             
-            # Extract warehouse code from stored location
-            warehouse_code = item.bin_location.split('-')[0] if '-' in item.bin_location else item.bin_location[:4]
+            # Get exact warehouse code from PO line instead of bin location
+            po_warehouse_code = None
+            for po_line in po_data.get('DocumentLines', []):
+                if po_line.get('ItemCode') == item.item_code:
+                    po_warehouse_code = po_line.get('WarehouseCode') or po_line.get('WhsCode')
+                    break
+            
+            # Use PO warehouse code, or fallback to extracted from bin location
+            warehouse_code = po_warehouse_code or (item.bin_location.split('-')[0] if '-' in item.bin_location else item.bin_location[:4])
             
             # Build line
             line = {
@@ -1292,13 +1305,24 @@ def preview_grpo_json(grpo_id):
             
             # Add batch information if available
             if item.batch_number:
+                # Format expiry date properly
+                expiry_date = doc_date + "T00:00:00Z"  # Default to PO date
+                if item.expiration_date:
+                    if hasattr(item.expiration_date, 'strftime'):
+                        expiry_date = item.expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+                    else:
+                        # If it's a string, ensure proper format
+                        expiry_date = str(item.expiration_date)
+                        if 'T' not in expiry_date:
+                            expiry_date += "T00:00:00Z"
+                
                 batch_info = {
                     "BatchNumber": item.batch_number,
                     "Quantity": item.received_quantity,
                     "BaseLineNumber": line_number,
                     "ManufacturerSerialNumber": getattr(item, 'manufacturer_serial', None) or "MFG-SN-001",
                     "InternalSerialNumber": getattr(item, 'internal_serial', None) or "INT-SN-001",
-                    "ExpiryDate": item.expiration_date.strftime('%Y-%m-%dT%H:%M:%SZ') if item.expiration_date else doc_date + "T00:00:00Z"
+                    "ExpiryDate": expiry_date
                 }
                 line["BatchNumbers"] = [batch_info]
             

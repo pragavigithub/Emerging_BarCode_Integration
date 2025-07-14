@@ -253,7 +253,7 @@ Changelog:
   - Enhanced warehouse code display in GRPO item listings for better visibility
   - Updated add item form to use warehouse code instead of complex bin location selection
   - Created comprehensive JSON preview API endpoint for real-time SAP B1 payload inspection
-- July 14, 2025. Final Migration to Replit Environment and Bug Fixes:
+- July 14, 2025. Final Migration to Replit Environment and JSON Structure Fixes:
   - Successfully completed migration from Replit Agent to Replit environment
   - Fixed PostgreSQL database configuration for production deployment
   - Enhanced JSON Preview functionality with detailed console logging and error handling
@@ -262,7 +262,12 @@ Changelog:
   - Improved inventory transfer display with "From Warehouse/To Warehouse" information
   - Added comprehensive debugging logs for JSON structure and SAP B1 API calls
   - Enhanced transfer request validation with mock data support for offline testing
-  - Application now runs seamlessly on Replit with full functionality
+  - Fixed Purchase Delivery Note JSON structure to match exact SAP B1 requirements:
+    * Date format: YYYY-MM-DD (no timestamps in dates)
+    * Warehouse codes extracted from PO DocumentLines instead of hardcoded values
+    * Proper batch number expiry date formatting with T00:00:00Z suffix
+    * Uses exact PO dates (DocDate, DocDueDate) for consistency
+  - Application now runs seamlessly on Replit with full functionality and correct SAP B1 integration
 - July 13, 2025. Final Migration to Replit Environment with Enhanced User Experience:
   - Successfully completed migration from Replit Agent to Replit environment
   - Set up PostgreSQL database for production deployment on Replit
