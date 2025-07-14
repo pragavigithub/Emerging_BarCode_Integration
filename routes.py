@@ -674,6 +674,25 @@ def reprint_label():
     
     return jsonify({'success': True, 'barcode': label.barcode})
 
+@app.route('/api/generate_barcode', methods=['POST'])
+@login_required
+def generate_barcode_api():
+    """Generate new barcode for item"""
+    data = request.get_json()
+    if not data or 'item_code' not in data:
+        return jsonify({'error': 'item_code is required'}), 400
+    
+    item_code = data['item_code']
+    
+    # Generate barcode with proper WMS format
+    import secrets
+    random_suffix = secrets.token_hex(4).upper()
+    barcode = f"WMS-{item_code}-{random_suffix}"
+    
+    return jsonify({'success': True, 'barcode': barcode})
+
+# Duplicate route removed - using existing update_grpo_item_field function
+
 @app.route('/user_management')
 @login_required
 def user_management():
@@ -954,54 +973,7 @@ def scan_barcode():
         }
     })
 
-@app.route('/api/generate_barcode', methods=['POST'])
-@login_required
-def generate_barcode_api():
-    """Generate new barcode for item"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-        
-        item_id = data.get('item_id')
-        item_code = data.get('item_code')
-        
-        if not item_id or not item_code:
-            return jsonify({'error': 'item_id and item_code are required'}), 400
-        
-        # Generate WMS format barcode
-        import secrets
-        random_suffix = secrets.token_hex(4).upper()
-        barcode = f"WMS-{item_code}-{random_suffix}"
-        
-        # Update GRPO item with generated barcode
-        grpo_item = GRPOItem.query.get(item_id)
-        if not grpo_item:
-            return jsonify({'error': 'GRPO item not found'}), 404
-        
-        grpo_item.generated_barcode = barcode
-        grpo_item.barcode_printed = False
-        db.session.commit()
-        
-        # Also save to barcode labels table for reprinting
-        label = BarcodeLabel(
-            item_code=item_code,
-            barcode=barcode,
-            label_format='standard',
-            print_count=0
-        )
-        db.session.add(label)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'barcode': barcode,
-            'message': f'Barcode {barcode} generated successfully'
-        })
-        
-    except Exception as e:
-        logging.error(f"Error generating barcode: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+# Duplicate generate_barcode_api route removed to prevent conflicts
 
 @app.route('/api/print_barcode', methods=['POST'])
 @login_required

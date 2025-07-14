@@ -108,19 +108,23 @@
                                         {% endif %}
                                     </td>
                                     <td>
+                                        {% set line_status = item.LineStatus or item.line_status or 'bost_Open' %}
                                         {% set received_items = grpo_doc.items|selectattr('po_line_number', 'equalto', item.LineNum)|selectattr('item_code', 'equalto', item.ItemCode or item.item_code)|list %}
                                         {% set total_received = received_items|sum(attribute='received_quantity') %}
                                         {% set po_quantity = item.Quantity or item.quantity or 0 %}
                                         {% set open_quantity = item.RemainingOpenQuantity or item.OpenQuantity or item.open_quantity or 0 %}
                                         {% set is_fully_received = (total_received >= open_quantity) and (open_quantity > 0) %}
+                                        {% set is_line_closed = line_status == 'bost_Close' %}
                                         
-                                        {% if not is_fully_received %}
-                                        <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}')">
+                                        {% if not is_line_closed and not is_fully_received and open_quantity > 0 %}
+                                        <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}', '{{ item.ItemName or item.item_name or item.Description }}', '{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or "EA" }}', '{{ item.WarehouseCode or item.WhsCode or "WH001" }}')">
                                             <i data-feather="plus"></i> Add
                                         </button>
                                         {% if received_items|length > 0 %}
                                         <br><small class="text-muted">{{ total_received }}/{{ open_quantity }} received ({{ open_quantity }} remaining)</small>
                                         {% endif %}
+                                        {% elif is_line_closed %}
+                                        <span class="badge bg-danger">Line Closed</span>
                                         {% else %}
                                         <span class="badge bg-success">Fully Received</span>
                                         {% endif %}
@@ -285,9 +289,12 @@
                         </a>
                         <div>
                             {% if grpo_doc.status == 'draft' %}
-                            <button class="btn btn-success" onclick="submitGRPO({{ grpo_doc.id }})">
+                            <button id="submitQCBtn" class="btn btn-success" onclick="submitGRPO({{ grpo_doc.id }})" {% if not grpo_doc.items %}disabled{% endif %}>
                                 <i data-feather="check"></i> Submit for QC Approval
                             </button>
+                            {% if not grpo_doc.items %}
+                            <small class="text-muted d-block">Add items to enable submission</small>
+                            {% endif %}
                             {% elif grpo_doc.status == 'submitted' and current_user.role in ['qc', 'manager', 'admin'] %}
                             <div class="btn-group">
                                 <button class="btn btn-success" onclick="approveGRPO({{ grpo_doc.id }})">
@@ -352,7 +359,7 @@
                     <div class="mb-3">
                         <label for="warehouse_code" class="form-label">Warehouse Code <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="warehouse_code" name="warehouse_code" 
-                               value="WH001" placeholder="Warehouse code from SAP B1" readonly required>
+                               placeholder="Warehouse code from SAP B1" readonly required>
                         <div class="form-text">Warehouse code is read-only (synced from SAP B1)</div>
                     </div>
                     <div class="row">
@@ -371,7 +378,12 @@
                     </div>
                     <div class="mb-3">
                         <label for="barcode" class="form-label">Barcode</label>
-                        <input type="text" class="form-control" id="barcode" name="barcode">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="barcode" name="barcode" placeholder="Generated barcode will appear here">
+                            <button type="button" class="btn btn-outline-primary" onclick="generateBarcodeForModal()">
+                                <i data-feather="plus"></i> Generate Barcode
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -411,8 +423,46 @@
 
 {% block scripts %}
 <script>
+// Global variables to store PO item data
+let selectedPoItemData = null;
+
+function addItemToGRPO(itemCode, itemName, uom, warehouseCode) {
+    // Store the PO item data for use in the modal
+    selectedPoItemData = {
+        itemCode: itemCode,
+        itemName: itemName || 'N/A',
+        uom: uom || 'EA',
+        warehouseCode: warehouseCode || 'WH001'
+    };
+    
+    // Populate the modal with PO data
+    document.getElementById('item_code').value = itemCode;
+    document.getElementById('item_name').value = selectedPoItemData.itemName;
+    document.getElementById('unit_of_measure').value = selectedPoItemData.uom;
+    document.getElementById('warehouse_code').value = selectedPoItemData.warehouseCode;
+    
+    // Clear previous values
+    document.getElementById('quantity').value = '';
+    document.getElementById('batch_number').value = '';
+    document.getElementById('expiration_date').value = '';
+    document.getElementById('barcode').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    modal.show();
+}
+
 function showAddItemModal() {
-    // No need to load bins, using warehouse code instead
+    // Clear all fields when opening manually
+    selectedPoItemData = null;
+    document.getElementById('item_code').value = '';
+    document.getElementById('item_name').value = '';
+    document.getElementById('unit_of_measure').value = 'EA';
+    document.getElementById('warehouse_code').value = '';
+    document.getElementById('quantity').value = '';
+    document.getElementById('batch_number').value = '';
+    document.getElementById('expiration_date').value = '';
+    document.getElementById('barcode').value = '';
+    
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
 }
@@ -637,55 +687,45 @@ function removeItem(itemId) {
     }
 }
 
-function generateBarcode(itemId, itemCode) {
-    // Generate barcode for the item
-    fetch('/api/generate_barcode', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            item_code: itemCode
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.barcode) {
-            // Update the item with the generated barcode
-            fetch(`/grpo/item/${itemId}/update_field`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    field_name: 'generated_barcode',
-                    field_value: data.barcode
-                })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    location.reload(); // Refresh to show the generated barcode
-                } else {
-                    alert('Error updating barcode: ' + result.error);
-                }
-            });
-        } else {
-            alert('Error generating barcode: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error generating barcode');
-    });
+// Removed duplicate function - using the one at the end of file
+
+// Removed duplicate function - using the one at the end of file
+
+// Generate barcode for the modal form
+function generateBarcodeForModal() {
+    const itemCodeInput = document.getElementById('item_code');
+    const barcodeInput = document.getElementById('barcode');
+    
+    if (!itemCodeInput.value.trim()) {
+        alert('Please enter an item code first');
+        itemCodeInput.focus();
+        return;
+    }
+    
+    // Generate WMS barcode format
+    const itemCode = itemCodeInput.value.trim();
+    const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase();
+    const generatedBarcode = `WMS-${itemCode}-${randomHex}`;
+    
+    barcodeInput.value = generatedBarcode;
+    console.log('🏷️ Generated barcode:', generatedBarcode);
 }
 
-function updateItemField(itemId, fieldName, fieldValue) {
-    // Show loading indicator
-    const loadingDiv = document.createElement('div');
-    loadingDiv.className = 'position-fixed top-50 start-50 translate-middle bg-primary text-white p-3 rounded';
-    loadingDiv.innerHTML = '<i data-feather="loader" class="spinning"></i> Updating...';
-    document.body.appendChild(loadingDiv);
+// Generate barcode for existing GRPO items
+function generateBarcode(itemId, itemCode) {
+    console.log('🏷️ Generating barcode for item:', itemCode, 'ID:', itemId);
+    
+    // Generate WMS barcode format
+    const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase();
+    const generatedBarcode = `WMS-${itemCode}-${randomHex}`;
+    
+    // Update the item with the generated barcode
+    updateItemField(itemId, 'generated_barcode', generatedBarcode);
+}
+
+// Update item field via AJAX
+function updateItemField(itemId, fieldName, value) {
+    console.log('📝 Updating item field:', itemId, fieldName, value);
     
     fetch(`/grpo/item/${itemId}/update_field`, {
         method: 'POST',
@@ -694,36 +734,23 @@ function updateItemField(itemId, fieldName, fieldValue) {
         },
         body: JSON.stringify({
             field_name: fieldName,
-            field_value: fieldValue
+            value: value
         })
     })
     .then(response => response.json())
     .then(data => {
-        document.body.removeChild(loadingDiv);
         if (data.success) {
-            // Show success feedback
-            const successDiv = document.createElement('div');
-            successDiv.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
-            successDiv.innerHTML = '<i data-feather="check"></i> Updated successfully';
-            document.body.appendChild(successDiv);
-            
-            // Remove success message after 2 seconds
-            setTimeout(() => {
-                if (document.body.contains(successDiv)) {
-                    document.body.removeChild(successDiv);
-                }
-            }, 2000);
-            
-            // Refresh feather icons
-            feather.replace();
+            console.log('✅ Field updated successfully');
+            // Refresh the page to show updates
+            location.reload();
         } else {
+            console.error('❌ Error updating field:', data.error);
             alert('Error updating field: ' + data.error);
         }
     })
     .catch(error => {
-        document.body.removeChild(loadingDiv);
-        console.error('Error:', error);
-        alert('Error updating field: ' + error);
+        console.error('❌ Network error:', error);
+        alert('Network error updating field');
     });
 }
 </script>
