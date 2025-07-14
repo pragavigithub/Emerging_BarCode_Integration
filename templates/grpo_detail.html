@@ -117,7 +117,7 @@
                                         {% set is_line_closed = line_status == 'bost_Close' %}
                                         
                                         {% if not is_line_closed and not is_fully_received and open_quantity > 0 %}
-                                        <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}', '{{ item.ItemName or item.item_name or item.Description }}', '{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or "EA" }}', '{{ item.WarehouseCode or item.WhsCode or "WH001" }}', {{ item|tojson|safe }})">
+                                        <button class="btn btn-sm btn-primary" onclick="console.log('🔘 Add button clicked for {{ item.ItemCode or item.item_code }}'); addItemToGRPO('{{ item.ItemCode or item.item_code }}', '{{ item.ItemName or item.item_name or item.Description }}', '{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or "EA" }}', '{{ item.WarehouseCode or item.WhsCode or "WH001" }}', {{ item|tojson|safe }})"
                                             <i data-feather="plus"></i> Add
                                             {% if item.SerialNum == 'tYES' %}
                                                 <span class="badge bg-warning ms-1">Serial</span>
@@ -475,6 +475,8 @@
 let selectedPoItemData = null;
 
 function addItemToGRPO(itemCode, itemName, uom, warehouseCode, poItemData = null) {
+    console.log('🔍 addItemToGRPO called with:', {itemCode, itemName, uom, warehouseCode, poItemData});
+    
     // Store the PO item data for use in the modal
     selectedPoItemData = {
         itemCode: itemCode,
@@ -485,6 +487,8 @@ function addItemToGRPO(itemCode, itemName, uom, warehouseCode, poItemData = null
         serialManaged: poItemData?.SerialNum === 'tYES' || false,
         batchManaged: poItemData?.ManageBatchNumbers === 'tYES' || false
     };
+    
+    console.log('📝 selectedPoItemData:', selectedPoItemData);
     
     // Populate the modal with PO data
     document.getElementById('item_code').value = itemCode;
@@ -545,8 +549,17 @@ function addItemToGRPO(itemCode, itemName, uom, warehouseCode, poItemData = null
         }
     }, 100);
     
-    const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
-    modal.show();
+    // Show the modal
+    console.log('🎭 Opening modal...');
+    const modalElement = document.getElementById('addItemModal');
+    if (modalElement) {
+        console.log('✅ Modal element found');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        console.log('✅ Modal.show() called');
+    } else {
+        console.error('❌ Modal element not found!');
+    }
 }
 
 function toggleWarehouseEdit() {
