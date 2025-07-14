@@ -81,27 +81,45 @@ class SAPIntegration:
             }
         
         try:
-            url = f"{self.base_url}/b1s/v1/InventoryTransferRequests?$filter=DocNum eq {doc_num}"
-            response = self.session.get(url)
+            # Try multiple endpoints to find the transfer request
+            endpoints_to_try = [
+                f"InventoryTransferRequests?$filter=DocNum eq {doc_num}",
+                f"InventoryTransferRequests?$filter=DocNum eq '{doc_num}'",
+                f"StockTransfers?$filter=DocNum eq {doc_num}",
+                f"StockTransfers?$filter=DocNum eq '{doc_num}'"
+            ]
             
-            logging.info(f"🔍 SAP B1 Transfer Request API call: {url}")
-            logging.info(f"📡 Response status: {response.status_code}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                transfers = data.get('value', [])
-                logging.info(f"📦 Found {len(transfers)} transfer requests for DocNum {doc_num}")
+            for endpoint in endpoints_to_try:
+                url = f"{self.base_url}/b1s/v1/{endpoint}"
+                logging.info(f"🔍 Trying SAP B1 API: {url}")
                 
-                if transfers:
-                    transfer_data = transfers[0]
-                    logging.info(f"✅ Transfer request found: {transfer_data.get('DocNum')} - Status: {transfer_data.get('DocStatus')}")
-                    return transfer_data
+                response = self.session.get(url)
+                logging.info(f"📡 Response status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    transfers = data.get('value', [])
+                    logging.info(f"📦 Found {len(transfers)} transfer requests for DocNum {doc_num}")
+                    
+                    if transfers:
+                        transfer_data = transfers[0]
+                        logging.info(f"✅ Transfer request found: {transfer_data.get('DocNum')} - Status: {transfer_data.get('DocStatus')}")
+                        
+                        # Normalize the response structure
+                        if 'StockTransferLines' not in transfer_data and 'DocumentLines' in transfer_data:
+                            transfer_data['StockTransferLines'] = transfer_data['DocumentLines']
+                            
+                        return transfer_data
+                    else:
+                        logging.info(f"No results from endpoint: {endpoint}")
+                        continue
                 else:
-                    logging.warning(f"❌ No transfer request found for DocNum {doc_num}")
-                    return None
-            else:
-                logging.error(f"❌ SAP B1 API error: {response.status_code} - {response.text}")
-                return None
+                    logging.warning(f"API call failed for {endpoint}: {response.status_code}")
+                    continue
+            
+            # If no endpoint worked, return None
+            logging.warning(f"❌ No transfer request found for DocNum {doc_num} in any endpoint")
+            return None
                 
         except Exception as e:
             logging.error(f"❌ Error getting inventory transfer request: {str(e)}")

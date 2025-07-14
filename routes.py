@@ -439,28 +439,51 @@ def inventory_transfer():
 @app.route('/inventory_transfer/create', methods=['POST'])
 @login_required
 def create_inventory_transfer():
-    transfer_request_number = request.form['transfer_request_number']
+    transfer_request_number = request.form['transfer_request_number'].strip()
+    
+    if not transfer_request_number:
+        flash('Please enter a transfer request number', 'error')
+        return redirect(url_for('inventory_transfer'))
+    
+    # Check if transfer already exists
+    existing_transfer = InventoryTransfer.query.filter_by(
+        transfer_request_number=transfer_request_number,
+        user_id=current_user.id
+    ).first()
+    
+    if existing_transfer:
+        flash(f'Transfer request {transfer_request_number} already exists for your account', 'warning')
+        return redirect(url_for('inventory_transfer_detail', transfer_id=existing_transfer.id))
     
     # Validate transfer request with SAP B1
     sap = SAPIntegration()
+    logging.info(f"🔍 Validating transfer request: {transfer_request_number}")
     transfer_data = sap.get_inventory_transfer_request(transfer_request_number)
     
     if not transfer_data:
-        flash(f'Transfer request {transfer_request_number} not found in SAP B1', 'error')
+        logging.error(f"❌ Transfer request {transfer_request_number} not found in SAP B1")
+        flash(f'Transfer request {transfer_request_number} not found in SAP B1. Please verify the number and try again.', 'error')
         return redirect(url_for('inventory_transfer'))
+    
+    # Extract warehouse information
+    from_warehouse = transfer_data.get('FromWarehouse', '')
+    to_warehouse = transfer_data.get('ToWarehouse', '')
+    
+    # Log transfer data for debugging
+    logging.info(f"✅ Transfer request found: {transfer_data.get('DocNum')} - From: {from_warehouse} - To: {to_warehouse}")
     
     # Create inventory transfer with warehouse information
     transfer = InventoryTransfer(
         transfer_request_number=transfer_request_number,
         user_id=current_user.id,
-        from_warehouse=transfer_data.get('FromWarehouse', ''),
-        to_warehouse=transfer_data.get('ToWarehouse', ''),
+        from_warehouse=from_warehouse,
+        to_warehouse=to_warehouse,
         status='draft'
     )
     db.session.add(transfer)
     db.session.commit()
     
-    flash(f'Inventory transfer {transfer_request_number} created successfully!', 'success')
+    flash(f'Inventory transfer {transfer_request_number} created successfully! From: {from_warehouse} → To: {to_warehouse}', 'success')
     return redirect(url_for('inventory_transfer_detail', transfer_id=transfer.id))
 
 @app.route('/inventory_transfer/<int:transfer_id>', methods=['GET', 'POST'])
