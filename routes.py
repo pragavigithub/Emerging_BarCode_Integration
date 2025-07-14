@@ -294,15 +294,31 @@ def approve_grpo(grpo_id):
     
     # If user selected 'post', submit to SAP B1
     if grpo_doc.draft_or_post == 'post':
+        logging.info("=" * 100)
+        logging.info("🚀 POSTING GRPO TO SAP B1 - PURCHASE DELIVERY NOTE CREATION")
+        logging.info("=" * 100)
+        logging.info(f"📋 GRPO ID: {grpo_doc.id}")
+        logging.info(f"📄 PO Number: {grpo_doc.po_number}")
+        logging.info(f"👤 User: {current_user.username}")
+        logging.info(f"🏢 Branch: {current_user.branch_id}")
+        
         sap = SAPIntegration()
         result = sap.post_grpo_to_sap(grpo_doc)
         
         if result.get('success'):
             grpo_doc.status = 'posted'
             grpo_doc.sap_document_number = result.get('sap_document_number')
+            logging.info("=" * 100)
+            logging.info("✅ SUCCESS: GRPO POSTED TO SAP B1")
+            logging.info(f"📄 SAP Document Number: {result.get('sap_document_number')}")
+            logging.info("=" * 100)
             flash(f'GRPO approved and posted to SAP B1 successfully! SAP Document Number: {result.get("sap_document_number")}', 'success')
         else:
             grpo_doc.status = 'approved'  # Keep as approved even if SAP posting fails
+            logging.error("=" * 100)
+            logging.error("❌ FAILED: GRPO POSTING TO SAP B1 FAILED")
+            logging.error(f"🚫 Error: {result.get('error')}")
+            logging.error("=" * 100)
             flash(f'GRPO approved but failed to post to SAP B1: {result.get("error")}', 'warning')
     else:
         grpo_doc.status = 'approved'
@@ -1052,12 +1068,27 @@ def post_grpo_to_sap_manual(grpo_id):
             return redirect(url_for('grpo_detail', grpo_id=grpo_id))
         
         # Post to SAP B1
+        logging.info("=" * 100)
+        logging.info("🔄 MANUAL POSTING GRPO TO SAP B1")
+        logging.info("=" * 100)
+        logging.info(f"📋 GRPO ID: {grpo_doc.id}")
+        logging.info(f"📄 PO Number: {grpo_doc.po_number}")
+        logging.info(f"👤 Manual Post User: {current_user.username}")
+        
         sap = SAPIntegration()
         result = sap.post_grpo_to_sap(grpo_doc)
         
         if result.get('success'):
+            logging.info("=" * 100)
+            logging.info("✅ SUCCESS: MANUAL GRPO POSTED TO SAP B1")
+            logging.info(f"📄 SAP Document Number: {result.get('sap_document_number')}")
+            logging.info("=" * 100)
             flash(f'GRPO successfully posted to SAP B1 as Purchase Delivery Note {result.get("sap_document_number")}.', 'success')
         else:
+            logging.error("=" * 100)
+            logging.error("❌ FAILED: MANUAL GRPO POSTING TO SAP B1 FAILED")
+            logging.error(f"🚫 Error: {result.get('error')}")
+            logging.error("=" * 100)
             flash(f'Error posting GRPO to SAP B1: {result.get("error")}', 'error')
         
         return redirect(url_for('grpo_detail', grpo_id=grpo_id))
@@ -1285,11 +1316,17 @@ def preview_grpo_json(grpo_id):
             "DocumentLines": document_lines
         }
         
-        # Log the JSON structure for debugging
+        # Log the complete JSON structure for debugging
         logging.info(f"🔍 JSON Preview Generated for GRPO {grpo_id}:")
         logging.info(f"📊 PO Number: {grpo_doc.po_number}")
         logging.info(f"📋 Total Lines: {len(document_lines)}")
-        logging.info(f"🏗️ JSON Structure: {json.dumps(pdn_data, indent=2)}")
+        logging.info("=" * 80)
+        logging.info("🏗️ COMPLETE JSON STRUCTURE TO BE POSTED TO SAP B1:")
+        logging.info("=" * 80)
+        print(json.dumps(pdn_data, indent=2, default=str))
+        logging.info("=" * 80)
+        logging.info("📤 END OF JSON STRUCTURE")
+        logging.info("=" * 80)
         
         return jsonify({
             'success': True,
