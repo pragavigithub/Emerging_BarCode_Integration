@@ -1230,13 +1230,19 @@ def preview_grpo_json(grpo_id):
         # Generate external reference
         external_ref = sap.generate_external_reference_number(grpo_doc)
         
-        # Get BusinessPlaceID
+        # Get BusinessPlaceID from PO DocumentLines instead of bin location
         first_warehouse_code = None
         if grpo_doc.items:
             for item in grpo_doc.items:
-                if item.qc_status == 'approved' and item.bin_location:
-                    first_warehouse_code = item.bin_location.split('-')[0] if '-' in item.bin_location else item.bin_location[:4]
-                    break
+                if item.qc_status == 'approved':
+                    # Find matching PO line to get proper warehouse code
+                    for po_line in po_data.get('DocumentLines', []):
+                        if po_line.get('ItemCode') == item.item_code:
+                            first_warehouse_code = po_line.get('WarehouseCode') or po_line.get('WhsCode')
+                            if first_warehouse_code:
+                                break
+                    if first_warehouse_code:
+                        break
         
         business_place_id = sap.get_warehouse_business_place_id(first_warehouse_code) if first_warehouse_code else 5
         

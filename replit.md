@@ -289,3 +289,11 @@ Changelog:
   - Enhanced form validation to require serial/batch numbers for managed items
   - Improved user experience with contextual alerts and field descriptions
   - Fixed database schema compatibility and migration issues for production deployment
+- July 14, 2025. Critical BusinessPlaceID Fix and Final Migration Completion:
+  - Fixed critical BusinessPlaceID extraction issue in Purchase Delivery Note creation
+  - Changed logic to extract warehouse code from PO DocumentLines instead of bin location parsing
+  - Updated both SAP integration and JSON preview functions to use correct SAP B1 API call:
+    * URL: https://SAP_SERVER/b1s/v1/Warehouses?$select=BusinessPlaceID&$filter=WarehouseCode eq 'WAREHOUSE_CODE'
+  - Enhanced warehouse code mapping to use WarehouseCode or WhsCode from Purchase Order lines
+  - Completed migration from Replit Agent to Replit environment successfully
+  - All functionality verified and working correctly with proper SAP B1 integration

@@ -917,14 +917,19 @@ class SAPIntegration:
         # Generate unique external reference number
         external_ref = self.generate_external_reference_number(grpo_document)
         
-        # Get first warehouse code to determine BusinessPlaceID
+        # Get first warehouse code from PO DocumentLines to determine BusinessPlaceID
         first_warehouse_code = None
         if grpo_document.items:
             for item in grpo_document.items:
-                if item.qc_status == 'approved' and item.bin_location:
-                    # Extract warehouse code from bin location
-                    first_warehouse_code = item.bin_location.split('-')[0] if '-' in item.bin_location else item.bin_location[:4]
-                    break
+                if item.qc_status == 'approved':
+                    # Find matching PO line to get proper warehouse code
+                    for po_line in po_data.get('DocumentLines', []):
+                        if po_line.get('ItemCode') == item.item_code:
+                            first_warehouse_code = po_line.get('WarehouseCode') or po_line.get('WhsCode')
+                            if first_warehouse_code:
+                                break
+                    if first_warehouse_code:
+                        break
         
         # Get BusinessPlaceID for the warehouse
         business_place_id = self.get_warehouse_business_place_id(first_warehouse_code) if first_warehouse_code else 5
