@@ -34,184 +34,10 @@ app.secret_key = os.environ.get(
     "SESSION_SECRET") or "dev-secret-key-change-in-production"
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure database - handle MySQL, MSSQL, PostgreSQL, and SQLite
-mysql_host = os.environ.get("MYSQL_HOST")
-mysql_port = os.environ.get("MYSQL_PORT", "3306")
-mysql_database = os.environ.get("MYSQL_DATABASE")
-mysql_username = os.environ.get("MYSQL_USERNAME")
-mysql_password = os.environ.get("MYSQL_PASSWORD")
-mssql_server = os.environ.get("MSSQL_SERVER")
-mssql_database = os.environ.get("MSSQL_DATABASE")
-mssql_username = os.environ.get("MSSQL_USERNAME")
-mssql_password = os.environ.get("MSSQL_PASSWORD")
+# Configure database for Replit environment with PostgreSQL
 database_url = os.environ.get("DATABASE_URL")
 
-# Database connection priority: MySQL > MSSQL > PostgreSQL > SQLite
-database_configured = False
-
-# Try MySQL first (only if all required variables are set and not empty)
-if (mysql_host and mysql_host.strip() and 
-    mysql_database and mysql_database.strip() and 
-    mysql_username and mysql_username.strip() and 
-    mysql_password and mysql_password.strip()):
-    
-    try:
-        from urllib.parse import quote_plus
-        
-        # Encode credentials for URL
-        encoded_username = quote_plus(mysql_username)
-        encoded_password = quote_plus(mysql_password)
-        encoded_host = quote_plus(mysql_host)
-        encoded_database = quote_plus(mysql_database)
-        
-        # Try multiple MySQL connection configurations
-        connection_configs = [
-            # Configuration 1: PyMySQL connector (recommended)
-            {
-                'url': f"mysql+pymysql://{encoded_username}:{encoded_password}@{encoded_host}:{mysql_port}/{encoded_database}?charset=utf8mb4",
-                'description': 'PyMySQL connector'
-            },
-            # Configuration 2: MySQL Connector/Python
-            {
-                'url': f"mysql+mysqlconnector://{encoded_username}:{encoded_password}@{encoded_host}:{mysql_port}/{encoded_database}?charset=utf8mb4",
-                'description': 'MySQL Connector/Python'
-            },
-            # Configuration 3: PyMySQL with SSL disabled
-            {
-                'url': f"mysql+pymysql://{encoded_username}:{encoded_password}@{encoded_host}:{mysql_port}/{encoded_database}?charset=utf8mb4&ssl_disabled=true",
-                'description': 'PyMySQL without SSL'
-            }
-        ]
-        
-        for config in connection_configs:
-            try:
-                logging.info(f"Trying MySQL connection: {config['description']}")
-                
-                # Test the connection first
-                from sqlalchemy import create_engine, text
-                test_engine = create_engine(config['url'], pool_timeout=5)
-                with test_engine.connect() as conn:
-                    conn.execute(text("SELECT 1"))
-                    # Connection successful, configure Flask
-                    app.config["SQLALCHEMY_DATABASE_URI"] = config['url']
-                    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-                        "pool_recycle": 300,
-                        "pool_pre_ping": True,
-                        "pool_size": 5,
-                        "max_overflow": 10,
-                        "pool_timeout": 10,
-                        "connect_args": {
-                            "connect_timeout": 30,
-                            "autocommit": False
-                        }
-                    }
-                    logging.info(f"✅ MySQL connection successful: {mysql_host}:{mysql_port}/{mysql_database}")
-                    database_configured = True
-                    break
-                    
-            except Exception as e:
-                logging.warning(f"❌ MySQL connection failed with {config['description']}: {e}")
-                continue
-        
-        if not database_configured:
-            logging.error(f"❌ All MySQL connection attempts failed for {mysql_host}:{mysql_port}/{mysql_database}")
-            logging.info("Falling back to next database option...")
-            
-    except Exception as e:
-        logging.error(f"MySQL connection error: {e}")
-        logging.info("Falling back to next database option...")
-
-# Try MSSQL second (only if all required variables are set and not empty)
-if (not database_configured and 
-    mssql_server and mssql_server.strip() and 
-    mssql_database and mssql_database.strip() and 
-    mssql_username and mssql_username.strip() and 
-    mssql_password and mssql_password.strip()):
-    
-    # Check if we're in a Windows environment (required for MSSQL)
-    import platform
-    if platform.system() == "Windows":
-        from urllib.parse import quote_plus
-        
-        try:
-            # Encode credentials for URL
-            encoded_username = quote_plus(mssql_username)
-            encoded_password = quote_plus(mssql_password)
-            encoded_server = quote_plus(mssql_server)
-            encoded_database = quote_plus(mssql_database)
-            
-            # Try multiple connection configurations for better compatibility
-            connection_configs = [
-                # Configuration 1: ODBC Driver 17 with TCP/IP and timeout settings
-                {
-                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&timeout=30&login_timeout=30",
-                    'description': 'ODBC Driver 17 with TCP/IP and timeouts'
-                },
-                # Configuration 2: ODBC Driver 17 with connection pooling disabled
-                {
-                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&Pooling=false",
-                    'description': 'ODBC Driver 17 without connection pooling'
-                },
-                # Configuration 3: ODBC Driver 17 with Mars disabled  
-                {
-                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&MARS_Connection=no",
-                    'description': 'ODBC Driver 17 without MARS'
-                },
-                # Configuration 4: SQL Server Native Client fallback
-                {
-                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=SQL+Server+Native+Client+11.0&TrustServerCertificate=yes",
-                    'description': 'SQL Server Native Client 11.0'
-                },
-                # Configuration 5: Legacy SQL Server driver
-                {
-                    'url': f"mssql+pyodbc://{encoded_username}:{encoded_password}@{encoded_server}/{encoded_database}?driver=SQL+Server&TrustServerCertificate=yes",
-                    'description': 'Legacy SQL Server driver'
-                }
-            ]
-            
-            for config in connection_configs:
-                try:
-                    logging.info(f"Trying MSSQL connection: {config['description']}")
-                    
-                    # Test the connection first
-                    from sqlalchemy import create_engine, text
-                    test_engine = create_engine(config['url'], pool_timeout=5)
-                    with test_engine.connect() as conn:
-                        conn.execute(text("SELECT 1"))
-                        # Connection successful, configure Flask
-                        app.config["SQLALCHEMY_DATABASE_URI"] = config['url']
-                        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-                            "pool_recycle": 300,
-                            "pool_pre_ping": True,
-                            "pool_size": 5,
-                            "max_overflow": 10,
-                            "pool_timeout": 10,
-                            "connect_args": {
-                                "timeout": 10,
-                                "autocommit": False
-                            }
-                        }
-                        logging.info(f"✅ MSSQL connection successful: {mssql_server}/{mssql_database}")
-                        database_configured = True
-                        break
-                        
-                except Exception as e:
-                    logging.warning(f"❌ MSSQL connection failed with {config['description']}: {e}")
-                    continue
-            
-            if not database_configured:
-                logging.error(f"❌ All MSSQL connection attempts failed for {mssql_server}/{mssql_database}")
-                logging.info("Falling back to next database option...")
-                
-        except Exception as e:
-            logging.error(f"MSSQL connection error: {e}")
-            logging.info("Falling back to next database option...")
-    else:
-        logging.info("MSSQL configuration detected but not supported on this platform (non-Windows)")
-        logging.info("Falling back to next database option...")
-
-# Try PostgreSQL if MySQL and MSSQL failed or not configured
-if not database_configured and database_url:
+if database_url:
     # Replit environment with PostgreSQL
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -220,12 +46,9 @@ if not database_configured and database_url:
         "pool_size": 10,
         "max_overflow": 20
     }
-    logging.info("Using PostgreSQL database")
-    database_configured = True
-
-# Fall back to SQLite if no other database is configured
-if not database_configured:
-    # Local development - create SQLite database with proper path handling
+    logging.info("✅ Using PostgreSQL database for Replit deployment")
+else:
+    # Local development fallback - create SQLite database with proper path handling
     import tempfile
     
     # Try to create instance directory in current working directory
@@ -241,7 +64,7 @@ if not database_configured:
         os.remove(test_file)
         
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
-        logging.info(f"Using SQLite database for local development: {db_path}")
+        logging.info(f"📁 Using SQLite database for local development: {db_path}")
         
     except (OSError, PermissionError) as e:
         # Fallback to temp directory
@@ -249,7 +72,7 @@ if not database_configured:
         temp_dir = tempfile.gettempdir()
         db_path = os.path.join(temp_dir, "wms.db")
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
-        logging.info(f"Using SQLite database in temp directory: {db_path}")
+        logging.info(f"📁 Using SQLite database in temp directory: {db_path}")
         
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_recycle": 300,
