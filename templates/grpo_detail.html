@@ -117,8 +117,14 @@
                                         {% set is_line_closed = line_status == 'bost_Close' %}
                                         
                                         {% if not is_line_closed and not is_fully_received and open_quantity > 0 %}
-                                        <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}', '{{ item.ItemName or item.item_name or item.Description }}', '{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or "EA" }}', '{{ item.WarehouseCode or item.WhsCode or "WH001" }}')">
+                                        <button class="btn btn-sm btn-primary" onclick="addItemToGRPO('{{ item.ItemCode or item.item_code }}', '{{ item.ItemName or item.item_name or item.Description }}', '{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or "EA" }}', '{{ item.WarehouseCode or item.WhsCode or "WH001" }}', {{ item|tojson|safe }})">
                                             <i data-feather="plus"></i> Add
+                                            {% if item.SerialNum == 'tYES' %}
+                                                <span class="badge bg-warning ms-1">Serial</span>
+                                            {% endif %}
+                                            {% if item.ManageBatchNumbers == 'tYES' %}
+                                                <span class="badge bg-info ms-1">Batch</span>
+                                            {% endif %}
                                         </button>
                                         {% if received_items|length > 0 %}
                                         <br><small class="text-muted">{{ total_received }}/{{ open_quantity }} received ({{ open_quantity }} remaining)</small>
@@ -351,21 +357,54 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="unit_of_measure" class="form-label">UoM <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="unit_of_measure" name="unit_of_measure" value="EA" required>
+                                <label for="unit_of_measure" class="form-label">Unit of Measure (UoM) <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="unit_of_measure" name="unit_of_measure" value="EA" readonly>
+                                <div class="form-text">Unit of measure from Purchase Order</div>
                             </div>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="warehouse_code" class="form-label">Warehouse Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="warehouse_code" name="warehouse_code" 
-                               placeholder="Warehouse code from SAP B1" readonly required>
-                        <div class="form-text">Warehouse code is read-only (synced from SAP B1)</div>
+                    
+                    <!-- Item Management Type Indicator -->
+                    <div class="mb-3" id="item_management_indicator" style="display: none;">
+                        <div class="alert alert-info">
+                            <i data-feather="info"></i> 
+                            <span id="management_type_text">This item requires management tracking</span>
+                        </div>
                     </div>
+                    
+                    <!-- Warehouse and Bin Location -->
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="batch_number" class="form-label">Batch Number</label>
+                                <label for="warehouse_code" class="form-label">Warehouse Code <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="warehouse_code" name="warehouse_code" 
+                                           placeholder="From Purchase Order" readonly required>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="toggleWarehouseEdit()">
+                                        <i data-feather="edit-2"></i> Edit
+                                    </button>
+                                </div>
+                                <div class="form-text">Warehouse from PO (click Edit to change)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="bin_location" class="form-label">Bin Location</label>
+                                <input type="text" class="form-control" id="bin_location" name="bin_location" 
+                                       placeholder="Auto-selected or enter manually">
+                                <div class="form-text">Will auto-populate based on warehouse</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Serial/Batch Management Section -->
+                    <div class="row" id="serial_batch_section">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="batch_number" class="form-label">
+                                    Batch Number
+                                    <span id="batch_required_indicator" class="text-danger" style="display: none;">*</span>
+                                </label>
                                 <input type="text" class="form-control" id="batch_number" name="batch_number">
                             </div>
                         </div>
@@ -375,6 +414,15 @@
                                 <input type="date" class="form-control" id="expiration_date" name="expiration_date">
                             </div>
                         </div>
+                    </div>
+                    
+                    <!-- Serial Number Section (hidden by default) -->
+                    <div class="mb-3" id="serial_number_section" style="display: none;">
+                        <label for="serial_number" class="form-label">
+                            Serial Number
+                            <span id="serial_required_indicator" class="text-danger" style="display: none;">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="serial_number" name="serial_number">
                     </div>
                     <div class="mb-3">
                         <label for="barcode" class="form-label">Barcode</label>
@@ -426,13 +474,16 @@
 // Global variables to store PO item data
 let selectedPoItemData = null;
 
-function addItemToGRPO(itemCode, itemName, uom, warehouseCode) {
+function addItemToGRPO(itemCode, itemName, uom, warehouseCode, poItemData = null) {
     // Store the PO item data for use in the modal
     selectedPoItemData = {
         itemCode: itemCode,
         itemName: itemName || 'N/A',
         uom: uom || 'EA',
-        warehouseCode: warehouseCode || 'WH001'
+        warehouseCode: warehouseCode || 'WH001',
+        managementType: poItemData?.ManagementType || 'None',
+        serialManaged: poItemData?.SerialNum === 'tYES' || false,
+        batchManaged: poItemData?.ManageBatchNumbers === 'tYES' || false
     };
     
     // Populate the modal with PO data
@@ -440,15 +491,93 @@ function addItemToGRPO(itemCode, itemName, uom, warehouseCode) {
     document.getElementById('item_name').value = selectedPoItemData.itemName;
     document.getElementById('unit_of_measure').value = selectedPoItemData.uom;
     document.getElementById('warehouse_code').value = selectedPoItemData.warehouseCode;
+    document.getElementById('bin_location').value = ''; // Will be populated based on warehouse
+    
+    // Show/hide management type indicator
+    const managementIndicator = document.getElementById('item_management_indicator');
+    const managementText = document.getElementById('management_type_text');
+    const serialSection = document.getElementById('serial_number_section');
+    const batchRequiredIndicator = document.getElementById('batch_required_indicator');
+    const serialRequiredIndicator = document.getElementById('serial_required_indicator');
+    
+    if (selectedPoItemData.serialManaged || selectedPoItemData.batchManaged) {
+        managementIndicator.style.display = 'block';
+        if (selectedPoItemData.serialManaged) {
+            managementText.innerHTML = '<i data-feather="hash"></i> This item requires Serial Number tracking';
+            serialSection.style.display = 'block';
+            serialRequiredIndicator.style.display = 'inline';
+        } else {
+            serialSection.style.display = 'none';
+            serialRequiredIndicator.style.display = 'none';
+        }
+        
+        if (selectedPoItemData.batchManaged) {
+            if (selectedPoItemData.serialManaged) {
+                managementText.innerHTML = '<i data-feather="hash"></i> This item requires Serial Number and Batch tracking';
+            } else {
+                managementText.innerHTML = '<i data-feather="package"></i> This item requires Batch Number tracking';
+            }
+            batchRequiredIndicator.style.display = 'inline';
+        } else {
+            batchRequiredIndicator.style.display = 'none';
+        }
+    } else {
+        managementIndicator.style.display = 'none';
+        serialSection.style.display = 'none';
+        batchRequiredIndicator.style.display = 'none';
+        serialRequiredIndicator.style.display = 'none';
+    }
     
     // Clear previous values
     document.getElementById('quantity').value = '';
     document.getElementById('batch_number').value = '';
+    document.getElementById('serial_number').value = '';
     document.getElementById('expiration_date').value = '';
     document.getElementById('barcode').value = '';
     
+    // Reset warehouse edit mode
+    document.getElementById('warehouse_code').readOnly = true;
+    
+    // Refresh feather icons
+    setTimeout(() => {
+        if (window.feather) {
+            feather.replace();
+        }
+    }, 100);
+    
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
+}
+
+function toggleWarehouseEdit() {
+    const warehouseCodeInput = document.getElementById('warehouse_code');
+    const editButton = event.target.closest('button');
+    
+    if (warehouseCodeInput.readOnly) {
+        warehouseCodeInput.readOnly = false;
+        warehouseCodeInput.focus();
+        editButton.innerHTML = '<i data-feather="save"></i> Save';
+        editButton.classList.remove('btn-outline-secondary');
+        editButton.classList.add('btn-outline-success');
+    } else {
+        warehouseCodeInput.readOnly = true;
+        editButton.innerHTML = '<i data-feather="edit-2"></i> Edit';
+        editButton.classList.remove('btn-outline-success');
+        editButton.classList.add('btn-outline-secondary');
+        
+        // Auto-populate bin location based on warehouse
+        const binLocationInput = document.getElementById('bin_location');
+        if (warehouseCodeInput.value) {
+            binLocationInput.value = warehouseCodeInput.value + '-BIN-01'; // Default bin
+        }
+    }
+    
+    // Refresh feather icons
+    setTimeout(() => {
+        if (window.feather) {
+            feather.replace();
+        }
+    }, 100);
 }
 
 function showAddItemModal() {

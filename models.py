@@ -161,6 +161,7 @@ class GRPOItem(db.Model):
     unit_price = Column(Float, nullable=True)
     bin_location = Column(String(20), nullable=False)
     batch_number = Column(String(50), nullable=True)
+    serial_number = Column(String(50), nullable=True)  # Serial number for serial-managed items
     expiration_date = Column(DateTime, nullable=True)
     supplier_barcode = Column(String(100),
                               nullable=True)  # Original supplier barcode

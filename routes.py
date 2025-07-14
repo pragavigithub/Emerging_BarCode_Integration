@@ -218,7 +218,9 @@ def add_grpo_item(grpo_id):
     item_code = request.form['item_code']
     quantity = float(request.form['quantity'])
     warehouse_code = request.form['warehouse_code']
+    bin_location = request.form.get('bin_location') or f"{warehouse_code}-BIN-01"
     batch_number = request.form.get('batch_number')
+    serial_number = request.form.get('serial_number')
     
     # Get PO line item details if available
     sap = SAPIntegration()
@@ -233,7 +235,7 @@ def add_grpo_item(grpo_id):
     
     # Generate barcode if not provided
     generated_barcode = None
-    if not request.form.get('supplier_barcode'):
+    if not request.form.get('barcode'):
         import secrets
         random_suffix = secrets.token_hex(4).upper()
         generated_barcode = f"WMS-{item_code}-{random_suffix}"
@@ -249,10 +251,11 @@ def add_grpo_item(grpo_id):
         received_quantity=quantity,
         unit_of_measure=po_line_item.get('UoMCode') or po_line_item.get('UoMEntry') or request.form.get('unit_of_measure', 'EA'),
         unit_price=po_line_item.get('Price') if po_line_item else 0,
-        bin_location=warehouse_code,  # Store warehouse code in bin_location field
+        bin_location=bin_location,
         batch_number=batch_number,
+        serial_number=serial_number,
         expiration_date=datetime.strptime(request.form['expiration_date'], '%Y-%m-%d') if request.form.get('expiration_date') else None,
-        supplier_barcode=request.form.get('supplier_barcode'),
+        supplier_barcode=request.form.get('barcode'),
         generated_barcode=generated_barcode
     )
     db.session.add(grpo_item)
