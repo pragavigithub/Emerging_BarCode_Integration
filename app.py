@@ -99,6 +99,42 @@ with app.app_context():
     import models_extensions
     db.create_all()
     logging.info("Database tables created")
+    
+    # Add missing columns for local SQLite development
+    if not database_url:  # Only for local SQLite
+        try:
+            from sqlalchemy import text
+            
+            # Check if we're using SQLite and add missing columns
+            if 'sqlite' in str(db.engine.url):
+                logging.info("🔧 Checking for missing columns in SQLite database...")
+                
+                # Try to add notes column to grpo_documents if it doesn't exist
+                try:
+                    db.session.execute(text("ALTER TABLE grpo_documents ADD COLUMN notes TEXT"))
+                    db.session.commit()
+                    logging.info("✅ Added 'notes' column to grpo_documents")
+                except Exception as e:
+                    if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+                        logging.info("✓ 'notes' column already exists")
+                    else:
+                        logging.debug(f"Notes column: {e}")
+                
+                # Try to add serial_number column to grpo_items if it doesn't exist
+                try:
+                    db.session.execute(text("ALTER TABLE grpo_items ADD COLUMN serial_number VARCHAR(50)"))
+                    db.session.commit()
+                    logging.info("✅ Added 'serial_number' column to grpo_items")
+                except Exception as e:
+                    if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+                        logging.info("✓ 'serial_number' column already exists")
+                    else:
+                        logging.debug(f"Serial number column: {e}")
+                        
+                logging.info("✅ SQLite schema migration completed")
+                
+        except Exception as e:
+            logging.warning(f"Schema migration warning: {e}")
 
     # Create default branch
     default_branch = models_extensions.Branch.query.filter_by(id='BR001').first()
