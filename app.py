@@ -34,11 +34,30 @@ app.secret_key = os.environ.get(
     "SESSION_SECRET") or "dev-secret-key-change-in-production"
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure database for Replit environment with PostgreSQL
-database_url = os.environ.get("DATABASE_URL")
+# Configure database with multiple database support
+# Priority: MySQL > PostgreSQL > SQLite (fallback)
+database_url = None
+db_type = "unknown"
+
+# Check for MySQL configuration
+mysql_host = os.environ.get("MYSQL_HOST")
+mysql_user = os.environ.get("MYSQL_USER")
+mysql_password = os.environ.get("MYSQL_PASSWORD")
+mysql_database = os.environ.get("MYSQL_DATABASE")
+
+if mysql_host and mysql_user and mysql_password and mysql_database:
+    # MySQL configuration
+    database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}/{mysql_database}"
+    db_type = "mysql"
+    logging.info("✅ Using MySQL database")
+elif os.environ.get("DATABASE_URL"):
+    # PostgreSQL configuration (Replit environment)
+    database_url = os.environ.get("DATABASE_URL")
+    db_type = "postgresql"
+    logging.info("✅ Using PostgreSQL database for Replit deployment")
 
 if database_url:
-    # Replit environment with PostgreSQL
+    # Production database configuration
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_recycle": 300,
@@ -46,11 +65,11 @@ if database_url:
         "pool_size": 10,
         "max_overflow": 20
     }
-    logging.info("✅ Using PostgreSQL database for Replit deployment")
 else:
     # Local development fallback - create SQLite database with proper path handling
     import tempfile
     
+    db_type = "sqlite"
     # Try to create instance directory in current working directory
     try:
         instance_dir = os.path.join(os.getcwd(), "instance")
@@ -78,6 +97,9 @@ else:
         "pool_recycle": 300,
         "pool_pre_ping": True,
     }
+
+# Store database type for use in other modules
+app.config["DB_TYPE"] = db_type
 
 # Initialize extensions with app
 db.init_app(app)
