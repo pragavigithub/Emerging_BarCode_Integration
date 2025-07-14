@@ -117,7 +117,12 @@
                                         {% set is_line_closed = line_status == 'bost_Close' %}
                                         
                                         {% if not is_line_closed and not is_fully_received and open_quantity > 0 %}
-                                        <button class="btn btn-sm btn-primary" onclick="console.log('🔘 Add button clicked for {{ item.ItemCode or item.item_code }}'); addItemToGRPO('{{ item.ItemCode or item.item_code }}', '{{ item.ItemName or item.item_name or item.Description }}', '{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or "EA" }}', '{{ item.WarehouseCode or item.WhsCode or "WH001" }}', {{ item|tojson|safe }})"
+                                        <button class="btn btn-sm btn-primary add-item-btn" 
+                                                data-item-code="{{ item.ItemCode or item.item_code }}"
+                                                data-item-name="{{ item.ItemName or item.item_name or item.Description }}"
+                                                data-uom="{{ item.UoMCode or item.UnitOfMeasure or item.unit_of_measure or item.UoM or 'EA' }}"
+                                                data-warehouse="{{ item.WarehouseCode or item.WhsCode or 'WH001' }}"
+                                                data-po-item="{{ item|tojson|e }}"
                                             <i data-feather="plus"></i> Add
                                             {% if item.SerialNum == 'tYES' %}
                                                 <span class="badge bg-warning ms-1">Serial</span>
@@ -895,5 +900,37 @@ function updateItemField(itemId, fieldName, value) {
         alert('Network error updating field');
     });
 }
+
+// Add event listeners when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Page loaded, setting up event listeners...');
+    
+    // Add event listeners for Add Item buttons
+    document.querySelectorAll('.add-item-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            console.log('🔘 Add button clicked');
+            
+            const itemCode = this.getAttribute('data-item-code');
+            const itemName = this.getAttribute('data-item-name');
+            const uom = this.getAttribute('data-uom');
+            const warehouse = this.getAttribute('data-warehouse');
+            const poItemJson = this.getAttribute('data-po-item');
+            
+            console.log('📦 Item data:', {itemCode, itemName, uom, warehouse});
+            
+            let poItemData = null;
+            try {
+                poItemData = JSON.parse(poItemJson);
+            } catch (e) {
+                console.warn('Could not parse PO item data:', e);
+            }
+            
+            // Call the function
+            addItemToGRPO(itemCode, itemName, uom, warehouse, poItemData);
+        });
+    });
+    
+    console.log('✅ Event listeners set up complete');
+});
 </script>
 {% endblock %}
