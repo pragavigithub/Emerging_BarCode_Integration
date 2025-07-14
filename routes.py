@@ -441,22 +441,113 @@ def inventory_transfer():
 def create_inventory_transfer():
     transfer_request_number = request.form['transfer_request_number']
     
-    # Create inventory transfer
+    # Validate transfer request with SAP B1
+    sap = SAPIntegration()
+    transfer_data = sap.get_inventory_transfer_request(transfer_request_number)
+    
+    if not transfer_data:
+        flash(f'Transfer request {transfer_request_number} not found in SAP B1', 'error')
+        return redirect(url_for('inventory_transfer'))
+    
+    # Create inventory transfer with warehouse information
     transfer = InventoryTransfer(
         transfer_request_number=transfer_request_number,
-        user_id=current_user.id
+        user_id=current_user.id,
+        from_warehouse=transfer_data.get('FromWarehouse', ''),
+        to_warehouse=transfer_data.get('ToWarehouse', ''),
+        status='draft'
     )
     db.session.add(transfer)
     db.session.commit()
     
-    flash('Inventory transfer created successfully!', 'success')
+    flash(f'Inventory transfer {transfer_request_number} created successfully!', 'success')
     return redirect(url_for('inventory_transfer_detail', transfer_id=transfer.id))
 
-@app.route('/inventory_transfer/<int:transfer_id>')
+@app.route('/inventory_transfer/<int:transfer_id>', methods=['GET', 'POST'])
 @login_required
 def inventory_transfer_detail(transfer_id):
     transfer = InventoryTransfer.query.get_or_404(transfer_id)
+    
+    # Handle adding items to transfer
+    if request.method == 'POST':
+        try:
+            item_code = request.form['item_code']
+            item_name = request.form['item_name']
+            quantity = float(request.form['quantity'])
+            unit_of_measure = request.form['unit_of_measure']
+            from_warehouse_code = request.form['from_warehouse_code']
+            to_warehouse_code = request.form['to_warehouse_code']
+            from_bin = request.form['from_bin']
+            to_bin = request.form['to_bin']
+            batch_number = request.form.get('batch_number', '')
+            
+            # Create new transfer item
+            transfer_item = InventoryTransferItem(
+                inventory_transfer_id=transfer.id,
+                item_code=item_code,
+                item_name=item_name,
+                quantity=quantity,
+                unit_of_measure=unit_of_measure,
+                from_bin=from_bin,
+                to_bin=to_bin,
+                batch_number=batch_number if batch_number else None
+            )
+            
+            db.session.add(transfer_item)
+            db.session.commit()
+            
+            flash(f'Item {item_code} added to transfer successfully!', 'success')
+            return redirect(url_for('inventory_transfer_detail', transfer_id=transfer_id))
+            
+        except Exception as e:
+            logging.error(f"Error adding item to transfer: {str(e)}")
+            flash(f'Error adding item: {str(e)}', 'error')
+            return redirect(url_for('inventory_transfer_detail', transfer_id=transfer_id))
+    
     return render_template('inventory_transfer_detail.html', transfer=transfer)
+
+@app.route('/inventory_transfer/<int:transfer_id>/submit', methods=['POST'])
+@login_required
+def submit_transfer(transfer_id):
+    """Submit inventory transfer to SAP B1"""
+    try:
+        transfer = InventoryTransfer.query.get_or_404(transfer_id)
+        
+        # Check if user owns this transfer
+        if transfer.user_id != current_user.id:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        # Check if transfer has items
+        if not transfer.items:
+            return jsonify({'success': False, 'error': 'Cannot submit transfer without items'}), 400
+        
+        # Check if already submitted
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Transfer already submitted'}), 400
+        
+        # Submit to SAP B1
+        sap = SAPIntegration()
+        result = sap.create_inventory_transfer(transfer)
+        
+        if result.get('success'):
+            # Update transfer status and SAP document number
+            transfer.status = 'submitted'
+            transfer.sap_document_number = result.get('document_number')
+            db.session.commit()
+            
+            logging.info(f"✅ Inventory Transfer {transfer_id} submitted to SAP B1 as document {result.get('document_number')}")
+            return jsonify({
+                'success': True, 
+                'message': f'Transfer submitted successfully to SAP B1 as document {result.get("document_number")}',
+                'sap_document_number': result.get('document_number')
+            })
+        else:
+            logging.error(f"❌ Failed to submit Inventory Transfer {transfer_id}: {result.get('error')}")
+            return jsonify({'success': False, 'error': result.get('error')}), 500
+            
+    except Exception as e:
+        logging.error(f"Error submitting transfer {transfer_id}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/pick_list')
 @login_required

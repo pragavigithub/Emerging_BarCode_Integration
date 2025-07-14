@@ -186,6 +186,8 @@ class InventoryTransfer(db.Model):
     status = Column(String(20),
                     default='draft')  # draft, approved, posted, rejected
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    from_warehouse = Column(String(20), nullable=True)
+    to_warehouse = Column(String(20), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime,
                         default=datetime.utcnow,

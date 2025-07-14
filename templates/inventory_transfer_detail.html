@@ -162,11 +162,17 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="item_code" class="form-label">Item Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="item_code" name="item_code" required>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="item_code" name="item_code" required>
+                            <button type="button" class="btn btn-outline-primary" onclick="scanItemCode()">
+                                <i data-feather="camera"></i> Scan Item
+                            </button>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="item_name" class="form-label">Item Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="item_name" name="item_name" required>
+                        <input type="text" class="form-control" id="item_name" name="item_name" readonly>
+                        <small class="text-muted">Auto-filled from SAP B1 when item is scanned</small>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
@@ -185,26 +191,48 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="from_bin" class="form-label">From Bin <span class="text-danger">*</span></label>
-                                <select class="form-select" id="from_bin" name="from_bin" required>
-                                    <option value="">Select From Bin</option>
-                                    <option value="A-01-01">A-01-01</option>
-                                    <option value="A-01-02">A-01-02</option>
-                                    <option value="B-01-01">B-01-01</option>
-                                    <option value="B-01-02">B-01-02</option>
-                                </select>
+                                <label for="from_warehouse_code" class="form-label">From Warehouse <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="from_warehouse_code" name="from_warehouse_code" value="{{ transfer.from_warehouse or '' }}" readonly>
+                                    <button type="button" class="btn btn-outline-primary" onclick="scanWarehouse('from')">
+                                        <i data-feather="camera"></i> Scan
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="to_bin" class="form-label">To Bin <span class="text-danger">*</span></label>
-                                <select class="form-select" id="to_bin" name="to_bin" required>
-                                    <option value="">Select To Bin</option>
-                                    <option value="A-01-01">A-01-01</option>
-                                    <option value="A-01-02">A-01-02</option>
-                                    <option value="B-01-01">B-01-01</option>
-                                    <option value="B-01-02">B-01-02</option>
-                                </select>
+                                <label for="to_warehouse_code" class="form-label">To Warehouse <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="to_warehouse_code" name="to_warehouse_code" value="{{ transfer.to_warehouse or '' }}" readonly>
+                                    <button type="button" class="btn btn-outline-primary" onclick="scanWarehouse('to')">
+                                        <i data-feather="camera"></i> Scan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="from_bin" class="form-label">From Bin Location <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="from_bin" name="from_bin" required>
+                                    <button type="button" class="btn btn-outline-primary" onclick="scanBin('from')">
+                                        <i data-feather="camera"></i> Scan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="to_bin" class="form-label">To Bin Location <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="to_bin" name="to_bin" required>
+                                    <button type="button" class="btn btn-outline-primary" onclick="scanBin('to')">
+                                        <i data-feather="camera"></i> Scan
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -238,11 +266,13 @@ function submitTransfer(transferId) {
                 'Content-Type': 'application/json',
             }
         })
-        .then(response => {
-            if (response.ok) {
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Transfer submitted successfully! SAP Document: ${data.sap_document_number}`);
                 location.reload();
             } else {
-                alert('Error submitting transfer');
+                alert(`Error submitting transfer: ${data.error}`);
             }
         })
         .catch(error => {
@@ -258,5 +288,91 @@ function removeItem(itemId) {
         console.log('Remove item:', itemId);
     }
 }
+
+// Enhanced scanning functionality for warehouse codes, items, and bins
+function scanWarehouse(type) {
+    // type can be 'from' or 'to'
+    const inputId = type === 'from' ? 'from_warehouse_code' : 'to_warehouse_code';
+    scanBarcode(inputId, function(code) {
+        document.getElementById(inputId).value = code;
+        alert(`${type.charAt(0).toUpperCase() + type.slice(1)} warehouse scanned: ${code}`);
+    });
+}
+
+function scanBin(type) {
+    // type can be 'from' or 'to'
+    const inputId = type === 'from' ? 'from_bin' : 'to_bin';
+    scanBarcode(inputId, function(code) {
+        document.getElementById(inputId).value = code;
+        alert(`${type.charAt(0).toUpperCase() + type.slice(1)} bin location scanned: ${code}`);
+    });
+}
+
+function scanItemCode() {
+    scanBarcode('item_code', function(code) {
+        document.getElementById('item_code').value = code;
+        
+        // Validate item with SAP B1 and get item name
+        fetch('/api/validate_item', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ item_code: code })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.valid) {
+                document.getElementById('item_name').value = data.item_data.ItemName || code;
+                document.getElementById('unit_of_measure').value = data.item_data.UoMEntry || 'EA';
+                alert(`Item found: ${data.item_data.ItemName || code}`);
+            } else {
+                alert(`Item not found: ${data.error}`);
+                document.getElementById('item_name').value = '';
+            }
+        })
+        .catch(error => {
+            console.error('Error validating item:', error);
+            document.getElementById('item_name').value = code; // Fallback
+        });
+    });
+}
+
+function scanBarcode(targetInputId, callback) {
+    // Check if we're in a mobile environment with camera access
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // Use camera for scanning
+        startCameraScanner(targetInputId, callback);
+    } else {
+        // Fallback to manual input
+        const code = prompt('Enter barcode manually:');
+        if (code) {
+            callback(code);
+        }
+    }
+}
+
+function startCameraScanner(targetInputId, callback) {
+    // This would integrate with QuaggaJS or similar barcode scanner
+    // For now, we'll use a simple prompt as fallback
+    const code = prompt('Camera scanner not available. Enter barcode manually:');
+    if (code) {
+        callback(code);
+    }
+}
+
+// Auto-populate warehouse codes from transfer request when modal opens
+document.getElementById('addItemModal').addEventListener('show.bs.modal', function () {
+    const fromWarehouse = document.getElementById('from_warehouse_code').value;
+    const toWarehouse = document.getElementById('to_warehouse_code').value;
+    
+    // Pre-fill warehouse codes in form if available
+    if (fromWarehouse) {
+        document.getElementById('from_warehouse_code').value = fromWarehouse;
+    }
+    if (toWarehouse) {
+        document.getElementById('to_warehouse_code').value = toWarehouse;
+    }
+});
 </script>
 {% endblock %}
