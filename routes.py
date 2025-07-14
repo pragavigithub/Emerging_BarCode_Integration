@@ -529,6 +529,38 @@ def inventory_transfer_detail(transfer_id):
     
     return render_template('inventory_transfer_detail.html', transfer=transfer)
 
+@app.route('/api/validate_transfer_request/<transfer_request_number>')
+@login_required
+def validate_transfer_request_api(transfer_request_number):
+    """API endpoint to validate transfer request number"""
+    try:
+        sap = SAPIntegration()
+        transfer_data = sap.get_inventory_transfer_request(transfer_request_number)
+        
+        if transfer_data:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'DocNum': transfer_data.get('DocNum'),
+                    'FromWarehouse': transfer_data.get('FromWarehouse'),
+                    'ToWarehouse': transfer_data.get('ToWarehouse'),
+                    'DocumentStatus': transfer_data.get('DocumentStatus', transfer_data.get('DocStatus')),
+                    'LineCount': len(transfer_data.get('StockTransferLines', []))
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Transfer request {transfer_request_number} not found'
+            })
+    
+    except Exception as e:
+        logging.error(f"Error validating transfer request: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
 @app.route('/inventory_transfer/<int:transfer_id>/submit', methods=['POST'])
 @login_required
 def submit_transfer(transfer_id):

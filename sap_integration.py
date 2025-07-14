@@ -63,9 +63,10 @@ class SAPIntegration:
             logging.warning("SAP B1 not available, returning mock transfer request for validation")
             # Return mock data for offline mode to allow testing
             return {
-                'DocNum': doc_num,
+                'DocNum': int(doc_num) if doc_num.isdigit() else doc_num,
                 'DocEntry': 123,
                 'DocStatus': 'bost_Open',
+                'DocumentStatus': 'bost_Open',
                 'FromWarehouse': 'WH001',
                 'ToWarehouse': 'WH002',
                 'StockTransferLines': [
@@ -103,11 +104,19 @@ class SAPIntegration:
                     
                     if transfers:
                         transfer_data = transfers[0]
-                        logging.info(f"✅ Transfer request found: {transfer_data.get('DocNum')} - Status: {transfer_data.get('DocStatus')}")
+                        doc_status = transfer_data.get('DocumentStatus', transfer_data.get('DocStatus', ''))
+                        logging.info(f"✅ Transfer request found: {transfer_data.get('DocNum')} - Status: {doc_status}")
                         
-                        # Normalize the response structure
+                        # Normalize the response structure for consistent access
                         if 'StockTransferLines' not in transfer_data and 'DocumentLines' in transfer_data:
                             transfer_data['StockTransferLines'] = transfer_data['DocumentLines']
+                        
+                        # Ensure consistent status field
+                        if 'DocumentStatus' in transfer_data and 'DocStatus' not in transfer_data:
+                            transfer_data['DocStatus'] = transfer_data['DocumentStatus']
+                            
+                        # Log the full structure for debugging
+                        logging.info(f"📋 Transfer Data: DocNum={transfer_data.get('DocNum')}, FromWarehouse={transfer_data.get('FromWarehouse')}, ToWarehouse={transfer_data.get('ToWarehouse')}")
                             
                         return transfer_data
                     else:
