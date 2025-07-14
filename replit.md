@@ -297,3 +297,15 @@ Changelog:
   - Enhanced warehouse code mapping to use WarehouseCode or WhsCode from Purchase Order lines
   - Completed migration from Replit Agent to Replit environment successfully
   - All functionality verified and working correctly with proper SAP B1 integration
+- July 14, 2025. Enhanced Transfer Request Validation and Local Database Migration:
+  - Fixed transfer request fetching issue by enhancing SAP integration with multiple endpoint support
+  - Improved response parsing to handle both DocumentStatus and DocStatus fields from SAP B1
+  - Enhanced error logging and debugging for transfer request validation
+  - Created comprehensive database migration scripts for local environments:
+    * migrate_database.py - Enhanced SQLite migration with warehouse columns
+    * migrate_database_mysql.py - MySQL/PostgreSQL migration with warehouse columns
+    * create_local_database.py - Complete fresh database creation with all tables
+    * quick_database_fix.py - Smart auto-detection and column addition
+  - Added validation API endpoint (/api/validate_transfer_request/) for testing
+  - Resolved missing warehouse columns issue for local development environments
+  - PostgreSQL database confirmed working with all required tables and columns
