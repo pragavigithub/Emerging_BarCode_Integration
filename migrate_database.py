@@ -129,6 +129,22 @@ def migrate_grpo_items(cursor):
     
     return migrations_applied
 
+def migrate_inventory_transfers(cursor):
+    """Add missing warehouse columns to inventory_transfers table"""
+    migrations_applied = []
+    
+    # Check and add from_warehouse column
+    if not check_column_exists(cursor, 'inventory_transfers', 'from_warehouse'):
+        cursor.execute('ALTER TABLE inventory_transfers ADD COLUMN from_warehouse VARCHAR(20)')
+        migrations_applied.append('Added from_warehouse column')
+    
+    # Check and add to_warehouse column
+    if not check_column_exists(cursor, 'inventory_transfers', 'to_warehouse'):
+        cursor.execute('ALTER TABLE inventory_transfers ADD COLUMN to_warehouse VARCHAR(20)')
+        migrations_applied.append('Added to_warehouse column')
+    
+    return migrations_applied
+
 def main():
     """Main migration function"""
     print("WMS Database Migration Tool")
@@ -159,11 +175,14 @@ def main():
         # Run migrations for grpo_items  
         grpo_item_migrations = migrate_grpo_items(cursor)
         
+        # Run migrations for inventory_transfers
+        inventory_transfer_migrations = migrate_inventory_transfers(cursor)
+        
         # Commit changes
         conn.commit()
         
         # Report results
-        all_migrations = grpo_doc_migrations + grpo_item_migrations
+        all_migrations = grpo_doc_migrations + grpo_item_migrations + inventory_transfer_migrations
         
         if all_migrations:
             print("\n✅ Migrations completed successfully!")

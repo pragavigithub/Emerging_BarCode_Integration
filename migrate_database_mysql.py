@@ -108,6 +108,8 @@ def add_missing_columns(connection, cursor, db_type):
         ('grpo_items', 'barcode_printed', 'BOOLEAN DEFAULT FALSE'),
         ('grpo_items', 'qc_status', "VARCHAR(20) DEFAULT 'pending'"),
         ('grpo_items', 'qc_notes', 'TEXT'),
+        ('inventory_transfers', 'from_warehouse', 'VARCHAR(20)'),
+        ('inventory_transfers', 'to_warehouse', 'VARCHAR(20)'),
         ('users', 'branch_id', 'VARCHAR(10)'),
         ('users', 'branch_name', 'VARCHAR(100)'),
         ('users', 'default_branch_id', 'VARCHAR(10)'),

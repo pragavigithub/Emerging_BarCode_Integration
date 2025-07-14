@@ -1,79 +1,87 @@
-# Local Development Quick Fix
+# 🚀 QUICK FIX for Missing Database Columns
 
-If you're getting the "table grpo_documents has no column named notes" error when running locally, this is because your local SQLite database needs to be updated with the latest schema changes.
+## The Problem
+Your local database is missing the new `from_warehouse` and `to_warehouse` columns in the `inventory_transfers` table, causing this error:
+```
+OperationalError: no such column: inventory_transfers.from_warehouse
+```
 
-## Automatic Fix (Recommended)
+## 🔧 Quick Solutions (Choose One)
 
-The application now automatically fixes missing columns when it starts. Simply restart your local application and the schema will be updated automatically.
+### Option 1: Run Migration Script (Recommended)
+```bash
+# For SQLite/local development
+python migrate_database.py
 
-## Manual Fix (If Needed)
+# For MySQL (if you're using MySQL locally)
+python migrate_database_mysql.py
+```
 
-If the automatic fix doesn't work, run these commands:
+### Option 2: Manual Database Fix (SQLite)
+```bash
+# Connect to your SQLite database and run:
+sqlite3 instance/database.db
 
-### For Windows (PowerShell):
-```powershell
-# Navigate to your project directory
-cd "E:\SAP_Integ\Git Change\20250714\6\Emerging_BarCode_Integration"
+# Then execute these commands:
+ALTER TABLE inventory_transfers ADD COLUMN from_warehouse VARCHAR(20);
+ALTER TABLE inventory_transfers ADD COLUMN to_warehouse VARCHAR(20);
+.exit
+```
 
-# Run the schema fix
-python fix_sqlite_schema.py
+### Option 3: Fresh Database Setup
+If migration fails, create fresh database:
+```bash
+# Delete existing database
+rm -f instance/database.db
 
-# Start the application
+# Run the application to create fresh tables
 python main.py
 ```
 
-### For Command Prompt:
-```cmd
-cd "E:\SAP_Integ\Git Change\20250714\6\Emerging_BarCode_Integration"
-python fix_sqlite_schema.py
-python main.py
+## 🔍 What These Scripts Do
+
+### migrate_database.py (SQLite)
+- ✅ Adds `from_warehouse` column to inventory_transfers
+- ✅ Adds `to_warehouse` column to inventory_transfers  
+- ✅ Adds other missing columns for GRPO functionality
+- ✅ Creates backup before making changes
+
+### migrate_database_mysql.py (MySQL/PostgreSQL)
+- ✅ Supports MySQL, PostgreSQL, and SQLite
+- ✅ Adds all missing warehouse columns
+- ✅ Handles different database syntax automatically
+- ✅ Creates missing tables if needed
+
+## 🎯 After Running Migration
+
+1. **Restart your application**
+2. **Test inventory transfer functionality**
+3. **Verify warehouse scanning works**
+
+## 📋 Verification Commands
+
+Check if columns were added successfully:
+```bash
+# For SQLite
+sqlite3 instance/database.db ".schema inventory_transfers"
+
+# For MySQL
+mysql -u [user] -p[password] [database] -e "DESCRIBE inventory_transfers;"
 ```
 
-## What This Fixes
+## 🆘 If Migration Fails
 
-The schema fix adds these missing columns:
-- `notes` column to `grpo_documents` table
-- `serial_number` column to `grpo_items` table
+1. Check database file exists: `ls -la instance/`
+2. Verify permissions: `chmod 664 instance/database.db`
+3. Run with debug: `python -v migrate_database.py`
+4. Create fresh database: `rm instance/database.db && python main.py`
 
-## Database Locations
+## ✅ Success Confirmation
 
-The application will try to create the database in this order:
-1. `instance/database.db` (preferred)
-2. `instance/wms.db` 
-3. Temporary directory (fallback)
+After migration, you should see:
+- ✅ Application starts without column errors
+- ✅ Inventory Transfer page loads correctly
+- ✅ Warehouse scanning functionality works
+- ✅ Data persists between sessions
 
-## Environment Variables
-
-For local development, make sure your `.env` file has:
-```
-# Leave DATABASE_URL empty for local SQLite development
-# DATABASE_URL=
-
-# Optional SAP B1 settings (for testing)
-SAP_B1_SERVER=https://192.168.1.5:50000
-SAP_B1_USERNAME=manager
-SAP_B1_PASSWORD=Ea@12345
-SAP_B1_COMPANY_DB=Test_Hutchinson
-SESSION_SECRET=your-secret-key-here
-```
-
-## Troubleshooting
-
-1. **Permission Error**: Make sure you have write permissions in your project directory
-2. **Database Locked**: Close any other applications that might be using the database
-3. **Module Not Found**: Make sure all dependencies are installed: `pip install -r requirements.txt`
-
-## Success Indicators
-
-When the fix works, you should see these messages in the console:
-```
-✅ Added 'notes' column to grpo_documents
-✅ Added 'serial_number' column to grpo_items
-✅ SQLite schema migration completed
-```
-
-## Default Login
-
-After setup, use these credentials:
-- Username: `admin`
-- Password: `admin123`
+Run the migration script now to fix your database! 🚀
