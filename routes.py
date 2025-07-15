@@ -491,6 +491,16 @@ def create_inventory_transfer():
 def inventory_transfer_detail(transfer_id):
     transfer = InventoryTransfer.query.get_or_404(transfer_id)
     
+    # Get available items from SAP transfer request (similar to GRPO)
+    available_items = []
+    sap = SAPIntegration()
+    
+    if transfer.transfer_request_number:
+        transfer_data = sap.get_inventory_transfer_request(transfer.transfer_request_number)
+        if transfer_data and 'StockTransferLines' in transfer_data:
+            available_items = transfer_data['StockTransferLines']
+            logging.info(f"Found {len(available_items)} available items for transfer request {transfer.transfer_request_number}")
+    
     # Handle adding items to transfer
     if request.method == 'POST':
         try:
@@ -527,7 +537,7 @@ def inventory_transfer_detail(transfer_id):
             flash(f'Error adding item: {str(e)}', 'error')
             return redirect(url_for('inventory_transfer_detail', transfer_id=transfer_id))
     
-    return render_template('inventory_transfer_detail.html', transfer=transfer)
+    return render_template('inventory_transfer_detail.html', transfer=transfer, available_items=available_items)
 
 @app.route('/api/validate_transfer_request/<transfer_request_number>')
 @login_required

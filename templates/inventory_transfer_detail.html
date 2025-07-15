@@ -127,6 +127,62 @@
         </div>
     </div>
 
+    <!-- Available Items from Transfer Request (Similar to GRPO) -->
+    {% if available_items %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i data-feather="list"></i> 
+                        Available Items from Transfer Request
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Item Code</th>
+                                    <th>Description</th>
+                                    <th>Requested Qty</th>
+                                    <th>UoM</th>
+                                    <th>From Warehouse</th>
+                                    <th>To Warehouse</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in available_items %}
+                                <tr>
+                                    <td><strong>{{ item.ItemCode or item.item_code }}</strong></td>
+                                    <td>{{ item.ItemDescription or item.item_description or item.ItemName or item.item_name }}</td>
+                                    <td>{{ item.Quantity or item.quantity }}</td>
+                                    <td>{{ item.UnitOfMeasure or item.unit_of_measure or item.UoM }}</td>
+                                    <td>{{ item.FromWarehouseCode or item.from_warehouse_code or transfer.from_warehouse }}</td>
+                                    <td>{{ item.ToWarehouseCode or item.to_warehouse_code or transfer.to_warehouse }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success" 
+                                            onclick="addItemFromRequest('{{ item.ItemCode or item.item_code }}', 
+                                                                        '{{ item.ItemDescription or item.item_description or item.ItemName or item.item_name }}', 
+                                                                        '{{ item.Quantity or item.quantity }}',
+                                                                        '{{ item.UnitOfMeasure or item.unit_of_measure or item.UoM }}',
+                                                                        '{{ item.FromWarehouseCode or item.from_warehouse_code or transfer.from_warehouse }}',
+                                                                        '{{ item.ToWarehouseCode or item.to_warehouse_code or transfer.to_warehouse }}')">
+                                            <i data-feather="plus"></i> Add
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Actions -->
     <div class="row">
         <div class="col-12">
@@ -254,6 +310,20 @@
 {% block scripts %}
 <script>
 function showAddItemModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    modal.show();
+}
+
+function addItemFromRequest(itemCode, itemName, quantity, uom, fromWarehouse, toWarehouse) {
+    // Pre-fill the add item modal with data from the transfer request
+    document.getElementById('item_code').value = itemCode;
+    document.getElementById('item_name').value = itemName;
+    document.getElementById('quantity').value = quantity;
+    document.getElementById('unit_of_measure').value = uom;
+    document.getElementById('from_warehouse_code').value = fromWarehouse;
+    document.getElementById('to_warehouse_code').value = toWarehouse;
+    
+    // Show the modal
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
 }
