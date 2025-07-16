@@ -420,60 +420,72 @@ class SAPIntegration:
             return None
 
     def create_inventory_transfer(self, transfer_document):
-        """Create Inventory Transfer in SAP B1"""
+        """Create Inventory Transfer in SAP B1 with correct JSON structure"""
         if not self.ensure_logged_in():
             return {'success': False, 'error': 'Not logged in to SAP B1'}
             
         url = f"{self.base_url}/b1s/v1/StockTransfers"
         
-        # Build stock transfer lines with correct structure
+        # Get transfer request data for BaseEntry
+        transfer_request_data = self.get_inventory_transfer_request(transfer_document.transfer_request_number)
+        base_entry = transfer_request_data.get('DocEntry') if transfer_request_data else None
+        
+        # Build stock transfer lines with exact structure from requirements
         stock_transfer_lines = []
-        for item in transfer_document.items:
-            # Extract warehouse codes from bin locations
-            from_warehouse = item.from_bin.split('-')[0] if '-' in item.from_bin else item.from_bin[:2]
-            to_warehouse = item.to_bin.split('-')[0] if '-' in item.to_bin else item.to_bin[:2]
+        for index, item in enumerate(transfer_document.items):
+            # Extract warehouse codes from bin locations or use transfer warehouse info
+            from_warehouse = transfer_document.from_warehouse
+            to_warehouse = transfer_document.to_warehouse
+            
+            # Find corresponding line in transfer request for price and UoM info
+            price = 0
+            unit_price = 0
+            uom_entry = None
+            uom_code = item.unit_of_measure
+            base_line = index
+            
+            if transfer_request_data and 'StockTransferLines' in transfer_request_data:
+                for req_line in transfer_request_data['StockTransferLines']:
+                    if req_line.get('ItemCode') == item.item_code:
+                        price = req_line.get('Price', 0)
+                        unit_price = req_line.get('UnitPrice', price)
+                        uom_entry = req_line.get('UoMEntry')
+                        uom_code = req_line.get('UoMCode', item.unit_of_measure)
+                        base_line = req_line.get('LineNum', index)
+                        break
             
             line = {
+                "LineNum": index,
                 "ItemCode": item.item_code,
-                "Quantity": item.quantity,
+                "Quantity": float(item.quantity),
+                "BaseEntry": base_entry,
+                "BaseLine": base_line,
+                "Price": price,
+                "BaseType": "Default",
+                "WarehouseCode": to_warehouse,
                 "FromWarehouseCode": from_warehouse,
-                "WarehouseCode": to_warehouse  # Target warehouse
+                "UnitPrice": unit_price,
+                "UoMCode": uom_code
             }
+            
+            # Add UoMEntry if available
+            if uom_entry:
+                line["UoMEntry"] = uom_entry
             
             # Add batch numbers if present
             if item.batch_number:
                 line["BatchNumbers"] = [{
                     "BatchNumber": item.batch_number,
-                    "Quantity": item.quantity
+                    "Quantity": float(item.quantity)
                 }]
-            
-            # Add bin allocations
-            bin_allocations = []
-            
-            # Get bin AbsEntry for from bin
-            from_bin_abs = self.get_bin_abs_entry(item.from_bin, from_warehouse)
-            if from_bin_abs:
-                bin_allocations.append({
-                    "BinAbsEntry": from_bin_abs,
-                    "Quantity": item.quantity
-                })
-            
-            # Get bin AbsEntry for to bin
-            to_bin_abs = self.get_bin_abs_entry(item.to_bin, to_warehouse)
-            if to_bin_abs:
-                bin_allocations.append({
-                    "BinAbsEntry": to_bin_abs,
-                    "Quantity": item.quantity
-                })
-            
-            if bin_allocations:
-                line["StockTransferLinesBinAllocations"] = bin_allocations
             
             stock_transfer_lines.append(line)
         
         transfer_data = {
             "DocDate": datetime.now().strftime('%Y-%m-%d'),
             "Comments": f"Created from WMS Transfer {transfer_document.id}",
+            "FromWarehouse": transfer_document.from_warehouse,
+            "ToWarehouse": transfer_document.to_warehouse,
             "StockTransferLines": stock_transfer_lines
         }
         

@@ -465,12 +465,28 @@ def create_inventory_transfer():
         flash(f'Transfer request {transfer_request_number} not found in SAP B1. Please verify the number and try again.', 'error')
         return redirect(url_for('inventory_transfer'))
     
+    # Check document status - only allow open transfer requests
+    doc_status = transfer_data.get('DocumentStatus', transfer_data.get('DocStatus', ''))
+    if doc_status.lower() not in ['open', 'bost_open', 'o']:
+        logging.error(f"❌ Transfer request {transfer_request_number} is not open. Status: {doc_status}")
+        flash(f'Transfer request {transfer_request_number} is closed or not available for processing. Status: {doc_status}', 'error')
+        return redirect(url_for('inventory_transfer'))
+    
+    # Check if there are any open line items
+    stock_transfer_lines = transfer_data.get('StockTransferLines', [])
+    open_lines = [line for line in stock_transfer_lines if line.get('LineStatus', '').lower() in ['open', 'bost_open', 'o'] or not line.get('LineStatus')]
+    
+    if not open_lines:
+        logging.error(f"❌ Transfer request {transfer_request_number} has no open line items")
+        flash(f'Transfer request {transfer_request_number} has no open line items available for processing.', 'error')
+        return redirect(url_for('inventory_transfer'))
+    
     # Extract warehouse information
     from_warehouse = transfer_data.get('FromWarehouse', '')
     to_warehouse = transfer_data.get('ToWarehouse', '')
     
     # Log transfer data for debugging
-    logging.info(f"✅ Transfer request found: {transfer_data.get('DocNum')} - From: {from_warehouse} - To: {to_warehouse}")
+    logging.info(f"✅ Transfer request found: {transfer_data.get('DocNum')} - From: {from_warehouse} - To: {to_warehouse} - Open Lines: {len(open_lines)}")
     
     # Create inventory transfer with warehouse information
     transfer = InventoryTransfer(
@@ -483,7 +499,7 @@ def create_inventory_transfer():
     db.session.add(transfer)
     db.session.commit()
     
-    flash(f'Inventory transfer {transfer_request_number} created successfully! From: {from_warehouse} → To: {to_warehouse}', 'success')
+    flash(f'Inventory transfer {transfer_request_number} created successfully! From: {from_warehouse} → To: {to_warehouse} ({len(open_lines)} open lines)', 'success')
     return redirect(url_for('inventory_transfer_detail', transfer_id=transfer.id))
 
 @app.route('/inventory_transfer/<int:transfer_id>', methods=['GET', 'POST'])
@@ -491,15 +507,17 @@ def create_inventory_transfer():
 def inventory_transfer_detail(transfer_id):
     transfer = InventoryTransfer.query.get_or_404(transfer_id)
     
-    # Get available items from SAP transfer request (similar to GRPO)
+    # Get available items from SAP transfer request (only open lines)
     available_items = []
     sap = SAPIntegration()
     
     if transfer.transfer_request_number:
         transfer_data = sap.get_inventory_transfer_request(transfer.transfer_request_number)
         if transfer_data and 'StockTransferLines' in transfer_data:
-            available_items = transfer_data['StockTransferLines']
-            logging.info(f"Found {len(available_items)} available items for transfer request {transfer.transfer_request_number}")
+            # Filter only open line items
+            all_lines = transfer_data['StockTransferLines']
+            available_items = [line for line in all_lines if line.get('LineStatus', '').lower() in ['open', 'bost_open', 'o'] or not line.get('LineStatus')]
+            logging.info(f"Found {len(available_items)} open items out of {len(all_lines)} total for transfer request {transfer.transfer_request_number}")
     
     # Handle adding items to transfer
     if request.method == 'POST':
@@ -1286,6 +1304,78 @@ def validate_transfer_request():
     except Exception as e:
         logging.error(f"Error validating transfer request: {str(e)}")
         return jsonify({'valid': False, 'error': f'Error validating transfer request: {str(e)}'})
+
+@app.route('/inventory_transfer/<int:transfer_id>/item/<int:item_id>/delete', methods=['POST'])
+@login_required
+def delete_transfer_item(transfer_id, item_id):
+    """Delete an item from inventory transfer"""
+    try:
+        transfer = InventoryTransfer.query.get_or_404(transfer_id)
+        
+        # Check if user owns this transfer
+        if transfer.user_id != current_user.id:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+        # Check if transfer is still in draft status
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Cannot delete items from submitted transfer'}), 400
+        
+        # Find and delete the item
+        item = InventoryTransferItem.query.filter_by(
+            id=item_id, 
+            inventory_transfer_id=transfer_id
+        ).first()
+        
+        if not item:
+            return jsonify({'success': False, 'error': 'Item not found'}), 404
+            
+        db.session.delete(item)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Item deleted successfully'})
+        
+    except Exception as e:
+        logging.error(f"Error deleting transfer item: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/inventory_transfer/<int:transfer_id>/item/<int:item_id>/edit', methods=['POST'])
+@login_required
+def edit_transfer_item(transfer_id, item_id):
+    """Edit an item in inventory transfer"""
+    try:
+        transfer = InventoryTransfer.query.get_or_404(transfer_id)
+        
+        # Check if user owns this transfer
+        if transfer.user_id != current_user.id:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+        # Check if transfer is still in draft status
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Cannot edit items in submitted transfer'}), 400
+        
+        # Find the item
+        item = InventoryTransferItem.query.filter_by(
+            id=item_id, 
+            inventory_transfer_id=transfer_id
+        ).first()
+        
+        if not item:
+            return jsonify({'success': False, 'error': 'Item not found'}), 404
+        
+        # Update item fields
+        data = request.get_json()
+        item.quantity = float(data.get('quantity', item.quantity))
+        item.from_bin = data.get('from_bin', item.from_bin)
+        item.to_bin = data.get('to_bin', item.to_bin)
+        item.batch_number = data.get('batch_number', item.batch_number) or None
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Item updated successfully'})
+        
+    except Exception as e:
+        logging.error(f"Error editing transfer item: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/bins', methods=['GET'])
 @login_required
