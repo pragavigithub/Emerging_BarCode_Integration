@@ -104,7 +104,8 @@ class User(UserMixin, db.Model):
                                   back_populates='user',
                                   foreign_keys='GRPODocument.user_id')
     inventory_transfers = relationship('InventoryTransfer',
-                                       back_populates='user')
+                                       back_populates='user',
+                                       foreign_keys='InventoryTransfer.user_id')
     pick_lists = relationship('PickList',
                               back_populates='user',
                               foreign_keys='PickList.user_id')
@@ -184,8 +185,11 @@ class InventoryTransfer(db.Model):
     transfer_request_number = Column(String(20), nullable=False)
     sap_document_number = Column(String(20), nullable=True)
     status = Column(String(20),
-                    default='draft')  # draft, approved, posted, rejected
+                    default='draft')  # draft, submitted, qc_approved, posted, rejected
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    qc_approver_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    qc_approved_at = Column(DateTime, nullable=True)
+    qc_notes = Column(Text, nullable=True)
     from_warehouse = Column(String(20), nullable=True)
     to_warehouse = Column(String(20), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -194,7 +198,8 @@ class InventoryTransfer(db.Model):
                         onupdate=datetime.utcnow)
 
     # Relationships
-    user = relationship('User', back_populates='inventory_transfers')
+    user = relationship('User', back_populates='inventory_transfers', foreign_keys=[user_id])
+    qc_approver = relationship('User', foreign_keys=[qc_approver_id])
     items = relationship('InventoryTransferItem',
                          back_populates='inventory_transfer')
 
@@ -213,6 +218,8 @@ class InventoryTransferItem(db.Model):
     from_bin = Column(String(20), nullable=False)
     to_bin = Column(String(20), nullable=False)
     batch_number = Column(String(50), nullable=True)
+    qc_status = Column(String(20), default='pending')  # pending, approved, rejected
+    qc_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

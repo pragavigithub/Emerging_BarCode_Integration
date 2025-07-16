@@ -532,13 +532,23 @@ def inventory_transfer_detail(transfer_id):
             to_bin = request.form['to_bin']
             batch_number = request.form.get('batch_number', '')
             
+            # Get item details from SAP B1 to ensure correct UOM
+            sap = SAPIntegration()
+            item_details = sap.get_item_details(item_code)
+            if item_details:
+                actual_uom = item_details.get('InventoryUoM', unit_of_measure)
+                logging.info(f"🔍 Item {item_code} UOM from SAP: {actual_uom}")
+            else:
+                actual_uom = unit_of_measure
+                logging.warning(f"⚠️ Could not get UOM from SAP for item {item_code}, using form value: {unit_of_measure}")
+            
             # Create new transfer item
             transfer_item = InventoryTransferItem(
                 inventory_transfer_id=transfer.id,
                 item_code=item_code,
                 item_name=item_name,
                 quantity=quantity,
-                unit_of_measure=unit_of_measure,
+                unit_of_measure=actual_uom,
                 from_bin=from_bin,
                 to_bin=to_bin,
                 batch_number=batch_number if batch_number else None
@@ -592,7 +602,7 @@ def validate_transfer_request_api(transfer_request_number):
 @app.route('/inventory_transfer/<int:transfer_id>/submit', methods=['POST'])
 @login_required
 def submit_transfer(transfer_id):
-    """Submit inventory transfer to SAP B1"""
+    """Submit inventory transfer for QC approval"""
     try:
         transfer = InventoryTransfer.query.get_or_404(transfer_id)
         
@@ -608,29 +618,129 @@ def submit_transfer(transfer_id):
         if transfer.status != 'draft':
             return jsonify({'success': False, 'error': 'Transfer already submitted'}), 400
         
+        # Update transfer status to submitted for QC approval
+        transfer.status = 'submitted'
+        transfer.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        logging.info(f"✅ Inventory Transfer {transfer_id} submitted for QC approval")
+        return jsonify({
+            'success': True, 
+            'message': 'Transfer submitted for QC approval successfully',
+            'status': 'submitted'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error submitting transfer: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/inventory_transfer/<int:transfer_id>/qc_approve', methods=['POST'])
+@login_required
+def qc_approve_transfer(transfer_id):
+    """QC approve inventory transfer and post to SAP B1"""
+    try:
+        transfer = InventoryTransfer.query.get_or_404(transfer_id)
+        
+        # Check if user has QC permissions
+        if not current_user.has_permission('qc_dashboard') and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied - QC permissions required'}), 403
+        
+        # Check if transfer is in submitted status
+        if transfer.status != 'submitted':
+            return jsonify({'success': False, 'error': 'Transfer must be submitted for QC approval'}), 400
+        
+        # Get QC notes from request
+        qc_notes = request.json.get('qc_notes', '') if request.is_json else request.form.get('qc_notes', '')
+        
+        # Mark individual items as approved
+        for item in transfer.items:
+            item.qc_status = 'approved'
+            
         # Submit to SAP B1
         sap = SAPIntegration()
         result = sap.create_inventory_transfer(transfer)
         
         if result.get('success'):
             # Update transfer status and SAP document number
-            transfer.status = 'submitted'
+            transfer.status = 'qc_approved'
+            transfer.qc_approver_id = current_user.id
+            transfer.qc_approved_at = datetime.utcnow()
+            transfer.qc_notes = qc_notes
             transfer.sap_document_number = result.get('document_number')
             db.session.commit()
             
-            logging.info(f"✅ Inventory Transfer {transfer_id} submitted to SAP B1 as document {result.get('document_number')}")
+            logging.info(f"✅ Inventory Transfer {transfer_id} QC approved and posted to SAP B1 as document {result.get('document_number')}")
             return jsonify({
                 'success': True, 
-                'message': f'Transfer submitted successfully to SAP B1 as document {result.get("document_number")}',
+                'message': f'Transfer QC approved and posted to SAP B1 as document {result.get("document_number")}',
                 'sap_document_number': result.get('document_number')
             })
         else:
-            logging.error(f"❌ Failed to submit Inventory Transfer {transfer_id}: {result.get('error')}")
+            logging.error(f"❌ Failed to post transfer {transfer_id} to SAP B1: {result.get('error')}")
             return jsonify({'success': False, 'error': result.get('error')}), 500
-            
+        
     except Exception as e:
-        logging.error(f"Error submitting transfer {transfer_id}: {str(e)}")
+        logging.error(f"Error QC approving transfer: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/inventory_transfer/<int:transfer_id>/qc_reject', methods=['POST'])
+@login_required
+def qc_reject_transfer(transfer_id):
+    """QC reject inventory transfer"""
+    try:
+        transfer = InventoryTransfer.query.get_or_404(transfer_id)
+        
+        # Check if user has QC permissions
+        if not current_user.has_permission('qc_dashboard') and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied - QC permissions required'}), 403
+        
+        # Check if transfer is in submitted status
+        if transfer.status != 'submitted':
+            return jsonify({'success': False, 'error': 'Transfer must be submitted for QC approval'}), 400
+        
+        # Get QC notes from request
+        qc_notes = request.json.get('qc_notes', '') if request.is_json else request.form.get('qc_notes', '')
+        
+        # Mark individual items as rejected
+        for item in transfer.items:
+            item.qc_status = 'rejected'
+            
+        # Update transfer status
+        transfer.status = 'rejected'
+        transfer.qc_approver_id = current_user.id
+        transfer.qc_approved_at = datetime.utcnow()
+        transfer.qc_notes = qc_notes
+        db.session.commit()
+        
+        logging.info(f"❌ Inventory Transfer {transfer_id} rejected by QC")
+        return jsonify({
+            'success': True, 
+            'message': 'Transfer rejected by QC',
+            'status': 'rejected'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error rejecting transfer: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/qc_dashboard')
+@login_required
+def qc_dashboard():
+    """QC Dashboard for approving transfers and GRPOs"""
+    # Check QC permissions
+    if not current_user.has_permission('qc_dashboard') and current_user.role not in ['admin', 'manager']:
+        flash('Access denied - QC permissions required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get pending transfers for QC approval
+    pending_transfers = InventoryTransfer.query.filter_by(status='submitted').order_by(InventoryTransfer.created_at.desc()).all()
+    
+    # Get pending GRPOs for QC approval
+    pending_grpos = GRPODocument.query.filter_by(status='submitted').order_by(GRPODocument.created_at.desc()).all()
+    
+    return render_template('qc_dashboard.html', 
+                         pending_transfers=pending_transfers,
+                         pending_grpos=pending_grpos)
 
 @app.route('/pick_list')
 @login_required
@@ -1246,33 +1356,6 @@ def post_grpo_to_sap_manual(grpo_id):
         logging.error(f"Error in post_grpo_to_sap_manual: {str(e)}")
         flash(f'Error posting GRPO to SAP B1: {str(e)}', 'error')
         return redirect(url_for('grpo_detail', grpo_id=grpo_id))
-    
-    if not item_code:
-        return jsonify({'error': 'Item code is required'}), 400
-    
-    # Generate unique barcode with proper WMS format
-    import secrets
-    random_suffix = secrets.token_hex(4).upper()
-    barcode = f"WMS-{item_code}-{random_suffix}"
-    
-    return jsonify({'barcode': barcode})
-
-@app.route('/qc_dashboard')
-@login_required
-def qc_dashboard():
-    """QC Dashboard for pending approvals"""
-    if current_user.role not in ['qc', 'manager', 'admin']:
-        flash('Access denied. QC role required.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    try:
-        pending_grpos = GRPODocument.query.filter_by(status='submitted').order_by(GRPODocument.created_at.desc()).all()
-    except Exception as e:
-        logging.error(f"Database error in QC dashboard: {e}")
-        pending_grpos = []
-        flash('Database needs to be updated. Please run: python reset_database.py', 'warning')
-    
-    return render_template('qc_dashboard.html', pending_grpos=pending_grpos)
 
 @app.route('/api/validate_transfer_request', methods=['POST'])
 @login_required
