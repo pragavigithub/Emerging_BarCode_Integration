@@ -1,246 +1,184 @@
-# MySQL Database Migration Guide for WMS Application
+# MySQL Database Migration Guide
 
 ## Overview
-This guide provides instructions for migrating the WMS application database schema when using MySQL as the primary database.
+This guide helps you migrate your WMS application from SQLite to MySQL for better performance and enterprise-level features.
 
-## Prerequisites
-- MySQL 5.7 or higher installed
-- Python with PyMySQL package installed
-- Proper MySQL environment variables configured
+## 🚀 Quick Setup
 
-## Environment Variables for MySQL
-Set the following environment variables for MySQL connection:
-
+### Option 1: Automated Setup (Recommended)
 ```bash
-export MYSQL_HOST=localhost
-export MYSQL_PORT=3306
-export MYSQL_USER=root
-export MYSQL_PASSWORD=your_password
-export MYSQL_DATABASE=wms_db
+# Run the MySQL setup script
+python setup_mysql_local.py
+
+# Run the migration
+python migrate_inventory_transfers.py
 ```
 
-## Migration Scripts
+### Option 2: Manual Setup
 
-### 1. Primary Migration Script
+#### Step 1: Install MySQL Python Packages
 ```bash
-python migrate_database_mysql.py
+pip install pymysql mysql-connector-python
 ```
 
-This script automatically:
-- Detects the database type (MySQL, PostgreSQL, or SQLite)
-- Adds missing columns to existing tables
-- Creates missing tables if they don't exist
-- Handles database-specific SQL syntax differences
-
-### 2. Database-Specific Features
-
-#### MySQL Syntax Handled:
-- `AUTO_INCREMENT` for primary keys
-- `DATETIME` for timestamp columns
-- `BOOLEAN` data types
-- `CURRENT_TIMESTAMP` default values
-- `VARCHAR` length specifications
-
-#### PostgreSQL Compatibility:
-- `SERIAL` for auto-increment
-- `TIMESTAMP` for datetime
-- Different boolean syntax
-
-#### SQLite Fallback:
-- `INTEGER PRIMARY KEY AUTOINCREMENT`
-- Simplified data types
-
-## Common Migration Scenarios
-
-### Adding New Columns
-The script automatically checks for and adds these columns if missing:
-
-#### grpo_documents table:
-- `notes` (TEXT) - General notes/comments
-- `qc_notes` (TEXT) - QC approval notes
-- `draft_or_post` (VARCHAR(10)) - Draft or post status
-
-#### grpo_items table:
-- `generated_barcode` (VARCHAR(100)) - WMS generated barcode
-- `barcode_printed` (BOOLEAN) - Print status flag
-- `qc_status` (VARCHAR(20)) - QC approval status
-- `qc_notes` (TEXT) - QC item notes
-
-#### users table:
-- `branch_id` (VARCHAR(10)) - Current branch
-- `branch_name` (VARCHAR(100)) - Branch display name
-- `default_branch_id` (VARCHAR(10)) - Default branch
-- `must_change_password` (BOOLEAN) - Password change flag
-- `last_login` (DATETIME) - Last login timestamp
-- `permissions` (TEXT) - User permissions JSON
-
-### Creating Missing Tables
-
-#### barcode_labels table:
+#### Step 2: Create MySQL Database
 ```sql
-CREATE TABLE barcode_labels (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    item_code VARCHAR(50) NOT NULL,
-    barcode VARCHAR(100) NOT NULL,
-    label_format VARCHAR(20) NOT NULL,
-    print_count INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_printed DATETIME NULL
-);
+-- Login to MySQL as root
+mysql -u root -p
+
+-- Create database
+CREATE DATABASE warehouse_wms;
+
+-- Create user (optional)
+CREATE USER 'wms_user'@'localhost' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON warehouse_wms.* TO 'wms_user'@'localhost';
+FLUSH PRIVILEGES;
 ```
 
-#### branches table:
+#### Step 3: Configure Environment Variables
+Create or update your `.env` file:
+```bash
+# MySQL Database Configuration
+MYSQL_HOST=localhost
+MYSQL_USER=wms_user
+MYSQL_PASSWORD=your_password
+MYSQL_DATABASE=warehouse_wms
+
+# Flask Session Secret
+SESSION_SECRET=your-secret-key-here
+
+# SAP B1 Configuration (optional)
+SAP_B1_SERVER=https://your-sap-server:50000
+SAP_B1_USERNAME=your-sap-username
+SAP_B1_PASSWORD=your-sap-password
+SAP_B1_COMPANY_DB=your-company-database
+```
+
+#### Step 4: Run Migration
+```bash
+python migrate_inventory_transfers.py
+```
+
+## 📊 Database Priority System
+
+The application automatically detects and uses databases in this order:
+
+1. **MySQL** - If `MYSQL_*` environment variables are set
+2. **PostgreSQL** - If `DATABASE_URL` is set (Replit environment)
+3. **SQLite** - Fallback for local development
+
+## 🔄 Migration Features
+
+### What the Migration Does:
+- Detects your current database type (MySQL/PostgreSQL/SQLite)
+- Adds missing QC approval columns to `inventory_transfers` table
+- Adds QC workflow columns to `inventory_transfer_items` table
+- Creates tables if they don't exist
+- Handles different SQL syntax for each database type
+
+### Added Columns:
+**inventory_transfers table:**
+- `qc_approver_id` (INT/INTEGER)
+- `qc_approved_at` (DATETIME/TIMESTAMP)
+- `qc_notes` (TEXT)
+- `from_warehouse` (VARCHAR(20))
+- `to_warehouse` (VARCHAR(20))
+
+**inventory_transfer_items table:**
+- `qc_status` (VARCHAR(20) DEFAULT 'pending')
+- `qc_notes` (TEXT)
+
+## 🛠️ Troubleshooting
+
+### MySQL Connection Issues
+```bash
+# Check MySQL service status
+sudo systemctl status mysql
+
+# Start MySQL service
+sudo systemctl start mysql
+
+# Connect to MySQL
+mysql -u root -p
+```
+
+### Permission Issues
 ```sql
-CREATE TABLE branches (
-    id VARCHAR(10) PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    address TEXT,
-    phone VARCHAR(20),
-    email VARCHAR(100),
-    manager_name VARCHAR(100),
-    is_default BOOLEAN DEFAULT FALSE,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+-- Grant all privileges to user
+GRANT ALL PRIVILEGES ON warehouse_wms.* TO 'wms_user'@'localhost';
+FLUSH PRIVILEGES;
 ```
 
-## Manual MySQL Commands
+### Port Issues
+```bash
+# Check if MySQL is running on port 3306
+netstat -an | grep 3306
 
-### Check Current Schema
-```sql
--- Check if a column exists
-SELECT COUNT(*) 
-FROM INFORMATION_SCHEMA.COLUMNS 
-WHERE TABLE_SCHEMA = DATABASE() 
-AND TABLE_NAME = 'grpo_documents' 
-AND COLUMN_NAME = 'notes';
-
--- List all tables
-SHOW TABLES;
-
--- Describe table structure
-DESCRIBE grpo_documents;
+# Or check MySQL configuration
+sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
 ```
 
-### Add Missing Column Manually
-```sql
--- Add notes column to grpo_documents
-ALTER TABLE grpo_documents ADD COLUMN notes TEXT NULL;
+## 🔧 Fix Scripts Available
 
--- Add barcode columns to grpo_items
-ALTER TABLE grpo_items ADD COLUMN generated_barcode VARCHAR(100) NULL;
-ALTER TABLE grpo_items ADD COLUMN barcode_printed BOOLEAN DEFAULT FALSE;
-```
+### For Database Schema Issues:
+1. **migrate_inventory_transfers.py** - Complete migration with table creation
+2. **fix_inventory_transfer_schema.py** - Quick column addition fix
+3. **run_database_fix.bat** - Interactive fix menu (Windows)
 
-## Troubleshooting
+### For MySQL Setup:
+1. **setup_mysql_local.py** - Interactive MySQL configuration
+2. **install_mysql_local.py** - Package installation and basic setup
 
-### Connection Issues
-1. Verify MySQL service is running:
+## 🎯 Benefits of MySQL Migration
+
+### Performance Benefits:
+- Better concurrent access handling
+- Improved query performance for large datasets
+- Professional database engine with optimization features
+
+### Enterprise Features:
+- Better backup and recovery options
+- User management and permissions
+- Replication and high availability support
+- Better integration with enterprise tools
+
+### Development Benefits:
+- More compatible with production environments
+- Better debugging and monitoring tools
+- Support for stored procedures and functions
+- More robust transaction handling
+
+## 📋 Post-Migration Verification
+
+After migration, verify the setup:
+
+1. **Check Database Connection:**
    ```bash
-   sudo systemctl status mysql
+   python -c "from migrate_inventory_transfers import get_database_connection; print(get_database_connection())"
    ```
 
-2. Test connection:
-   ```bash
-   mysql -h localhost -u root -p
-   ```
-
-3. Check environment variables:
-   ```bash
-   echo $MYSQL_HOST
-   echo $MYSQL_USER
-   echo $MYSQL_DATABASE
-   ```
-
-### Permission Errors
-1. Grant proper permissions:
+2. **Verify Tables:**
    ```sql
-   GRANT ALL PRIVILEGES ON wms_db.* TO 'your_user'@'localhost';
-   FLUSH PRIVILEGES;
+   USE warehouse_wms;
+   SHOW TABLES;
+   DESCRIBE inventory_transfers;
+   DESCRIBE inventory_transfer_items;
    ```
 
-2. Create database if it doesn't exist:
-   ```sql
-   CREATE DATABASE wms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-
-### Migration Failures
-1. Check MySQL error log:
+3. **Test Application:**
    ```bash
-   sudo tail -f /var/log/mysql/error.log
+   python app.py
+   # Access inventory transfer module
+   # Create a test transfer
+   # Submit for QC approval
    ```
 
-2. Rollback and retry:
-   ```sql
-   ROLLBACK;
-   ```
-
-3. Manual column addition if script fails:
-   ```sql
-   -- Check what columns exist
-   SHOW COLUMNS FROM grpo_documents;
-   
-   -- Add missing columns one by one
-   ALTER TABLE grpo_documents ADD COLUMN notes TEXT;
-   ```
-
-## Validation
-
-### Verify Migration Success
-```sql
--- Check all expected columns exist
-SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE 
-FROM INFORMATION_SCHEMA.COLUMNS 
-WHERE TABLE_SCHEMA = DATABASE() 
-AND TABLE_NAME = 'grpo_documents';
-
--- Verify data integrity
-SELECT COUNT(*) FROM grpo_documents;
-SELECT COUNT(*) FROM grpo_items;
-SELECT COUNT(*) FROM users;
-```
-
-### Test Application
-1. Start the application:
-   ```bash
-   python main.py
-   ```
-
-2. Check for database errors in logs
-3. Test GRPO creation and editing functionality
-4. Verify barcode generation works
-
-## Best Practices
-
-1. **Always backup before migration:**
-   ```bash
-   mysqldump -u root -p wms_db > wms_backup_$(date +%Y%m%d).sql
-   ```
-
-2. **Test migrations on development environment first**
-
-3. **Monitor application logs during migration:**
-   ```bash
-   tail -f application.log
-   ```
-
-4. **Use transactions for complex migrations:**
-   ```sql
-   START TRANSACTION;
-   -- Migration commands here
-   COMMIT;  -- or ROLLBACK; if issues
-   ```
-
-## Support
+## 🆘 Support
 
 If you encounter issues:
-1. Check the application logs for database errors
-2. Verify all environment variables are set correctly
-3. Ensure MySQL user has proper permissions
-4. Test database connection manually
-5. Run the migration script with verbose logging
+1. Check MySQL service is running
+2. Verify database credentials
+3. Run the migration script again
+4. Check application logs for detailed error messages
 
-For additional help, check the main application logs and ensure all dependencies are installed:
-```bash
-pip install PyMySQL mysql-connector-python
-```
+The migration scripts are designed to be safe and can be run multiple times without issues.

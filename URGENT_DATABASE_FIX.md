@@ -5,7 +5,7 @@ Your local database is missing the new QC approval columns that were added to th
 
 ## 🔧 IMMEDIATE FIX - Choose ONE option:
 
-### Option 1: Quick Database Reset (RECOMMENDED)
+### Option 1: Quick Database Reset (RECOMMENDED for SQLite)
 ```bash
 # Navigate to your project directory
 cd "E:\SAP_Integ\Git Change\20250717\1\Emerging_BarCode_Integration"
@@ -20,16 +20,25 @@ del warehouse.db
 python app.py
 ```
 
-### Option 2: Run the Migration Script
+### Option 2: Run the Migration Script (SUPPORTS MySQL, PostgreSQL, SQLite)
 ```bash
 # Run the migration script I created
 python migrate_inventory_transfers.py
 ```
 
-### Option 3: Manual SQL Fix
+### Option 3: Manual SQL Fix (SUPPORTS MySQL, PostgreSQL, SQLite)
 ```bash
 # Run the quick fix script
 python fix_inventory_transfer_schema.py
+```
+
+### Option 4: Switch to MySQL (NEW!)
+```bash
+# Set up MySQL database
+python setup_mysql_local.py
+
+# Then run the migration
+python migrate_inventory_transfers.py
 ```
 
 ## 📋 What This Fixes

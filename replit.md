@@ -346,3 +346,13 @@ Changelog:
   - Enhanced Stock Transfer API with proper bin allocation and batch number handling
   - Added QC rejection functionality with proper status tracking
   - Improved error handling and logging for SAP B1 integration
+- July 17, 2025. Comprehensive MySQL Database Support Integration:
+  - Enhanced all migration scripts to support MySQL, PostgreSQL, and SQLite databases
+  - Added MySQL-specific setup script (setup_mysql_local.py) for easy local MySQL configuration
+  - Updated database connection priority system: MySQL → PostgreSQL → SQLite fallback
+  - Enhanced migration scripts with MySQL-specific SQL syntax (AUTO_INCREMENT, DECIMAL, etc.)
+  - Created comprehensive MySQL migration guide (README_MYSQL_MIGRATION.md)
+  - Updated fix scripts to handle MySQL column additions and schema modifications
+  - Added MySQL package installation and connection testing functionality
+  - Enhanced batch fix script to include MySQL setup option
+  - All database schema fixes now support multi-database environments seamlessly
