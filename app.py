@@ -46,8 +46,10 @@ mysql_password = os.environ.get("MYSQL_PASSWORD")
 mysql_database = os.environ.get("MYSQL_DATABASE")
 
 if mysql_host and mysql_user and mysql_password and mysql_database:
-    # MySQL configuration
-    database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}/{mysql_database}"
+    # MySQL configuration with proper URL encoding
+    from urllib.parse import quote_plus
+    encoded_password = quote_plus(mysql_password)
+    database_url = f"mysql+pymysql://{mysql_user}:{encoded_password}@{mysql_host}/{mysql_database}"
     db_type = "mysql"
     logging.info("✅ Using MySQL database")
 elif os.environ.get("DATABASE_URL"):
@@ -65,11 +67,14 @@ if database_url:
         "pool_size": 10,
         "max_overflow": 20
     }
+    logging.info(f"Database URL configured: {database_url.replace(encoded_password, '***') if 'encoded_password' in locals() else database_url}")
 else:
     # Local development fallback - create SQLite database with proper path handling
     import tempfile
     
     db_type = "sqlite"
+    logging.info("⚠️  MySQL/PostgreSQL not configured, falling back to SQLite")
+    
     # Try to create instance directory in current working directory
     try:
         instance_dir = os.path.join(os.getcwd(), "instance")
