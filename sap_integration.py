@@ -468,7 +468,7 @@ class SAPIntegration:
             if base_entry:
                 line["BaseEntry"] = base_entry
                 line["BaseLine"] = base_line
-                line["BaseType"] = 1234000896  # oInventoryTransferRequest
+                line["BaseType"] = "InventoryTransferRequest"  # oInventoryTransferRequest
                 
             # Add pricing if available
             if price > 0:
@@ -511,9 +511,10 @@ class SAPIntegration:
             "DocDate": datetime.now().strftime('%Y-%m-%d'),
             "Comments": f"QC Approved WMS Transfer {transfer_document.id} by {transfer_document.qc_approver.username if transfer_document.qc_approver else 'System'}",
             "FromWarehouse": transfer_document.from_warehouse,
+            "ToFromWarehouse":transfer_document.to_warehouse,
             "StockTransferLines": stock_transfer_lines
         }
-        
+        print(transfer_data)
         # Log the JSON payload for debugging
         logging.info(f"📤 Sending stock transfer to SAP B1:")
         logging.info(f"JSON payload: {json.dumps(transfer_data, indent=2)}")
