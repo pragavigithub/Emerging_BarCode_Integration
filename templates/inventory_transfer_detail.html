@@ -29,8 +29,10 @@
                         <div>
                             {% if transfer.status == 'draft' %}
                                 <span class="badge bg-secondary">Draft</span>
-                            {% elif transfer.status == 'approved' %}
-                                <span class="badge bg-success">Approved</span>
+                            {% elif transfer.status == 'submitted' %}
+                                <span class="badge bg-warning text-dark">Submitted</span>
+                            {% elif transfer.status == 'qc_approved' %}
+                                <span class="badge bg-success">QC Approved</span>
                             {% elif transfer.status == 'posted' %}
                                 <span class="badge bg-primary">Posted</span>
                             {% elif transfer.status == 'rejected' %}
@@ -69,9 +71,11 @@
                             <i data-feather="package"></i> 
                             Transfer Items
                         </h6>
+                        {% if transfer.status == 'draft' %}
                         <button class="btn btn-sm btn-success" onclick="showAddItemModal()">
                             <i data-feather="plus"></i> Add Item
                         </button>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="card-body">
@@ -107,12 +111,16 @@
                                     </td>
                                     <td>{{ item.batch_number or '-' }}</td>
                                     <td>
+                                        {% if transfer.status == 'draft' %}
                                         <button class="btn btn-sm btn-primary me-1" onclick="editItem({{ item.id }}, '{{ item.item_code }}', '{{ item.item_name }}', {{ item.quantity }}, '{{ item.unit_of_measure }}', '{{ item.from_bin }}', '{{ item.to_bin }}', '{{ item.batch_number or '' }}')">
                                             <i data-feather="edit"></i>
                                         </button>
                                         <button class="btn btn-sm btn-danger" onclick="removeItem({{ item.id }})">
                                             <i data-feather="trash-2"></i>
                                         </button>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -196,10 +204,20 @@
                             <i data-feather="arrow-left"></i> Back to Transfer List
                         </a>
                         <div>
-                            {% if transfer.status == 'draft' %}
+                            {% if transfer.status == 'draft' and transfer.items %}
                             <button class="btn btn-success" onclick="submitTransfer({{ transfer.id }})">
-                                <i data-feather="check"></i> Submit Transfer
+                                <i data-feather="check"></i> Submit for QC Approval
                             </button>
+                            {% elif transfer.status == 'submitted' %}
+                            <div class="alert alert-info mb-0">
+                                <i data-feather="clock"></i>
+                                Transfer submitted and waiting for QC approval. Only QC users can approve this transfer.
+                            </div>
+                            {% elif transfer.status == 'qc_approved' %}
+                            <div class="alert alert-success mb-0">
+                                <i data-feather="check-circle"></i>
+                                Transfer QC approved and posted to SAP B1. SAP Document: {{ transfer.sap_document_number }}
+                            </div>
                             {% endif %}
                         </div>
                     </div>
