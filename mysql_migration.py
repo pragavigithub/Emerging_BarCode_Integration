@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 MySQL Migration Script for WMS Application
@@ -29,9 +30,9 @@ logger = logging.getLogger(__name__)
 def get_mysql_connection():
     """Get MySQL connection using environment variables"""
     mysql_host = os.getenv('MYSQL_HOST', 'localhost')
-    mysql_user = os.getenv('MYSQL_USER')
-    mysql_password = os.getenv('MYSQL_PASSWORD')
-    mysql_database = os.getenv('MYSQL_DATABASE')
+    mysql_user = os.getenv('MYSQL_USER','root')
+    mysql_password = os.getenv('MYSQL_PASSWORD','root@123')
+    mysql_database = os.getenv('MYSQL_DATABASE','wms_db_dev')
     mysql_port = int(os.getenv('MYSQL_PORT', '3306'))
     
     if not all([mysql_user, mysql_password, mysql_database]):
