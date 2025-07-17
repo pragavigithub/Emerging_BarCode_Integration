@@ -337,3 +337,12 @@ Changelog:
   - Added JavaScript functions for seamless edit/delete operations with modal forms
   - Enhanced user experience with edit mode detection and form reset functionality
   - Updated SAP JSON structure to match exact requirements with proper warehouse mapping
+- July 16, 2025. QC Approval Workflow Enhancement and Local Development Fix:
+  - Added complete QC approval workflow to inventory transfers (draft → submitted → qc_approved → posted)
+  - Enhanced UOM handling with direct SAP B1 item master data retrieval
+  - Fixed foreign key relationship issues in database models
+  - Added QC approval columns to inventory_transfers table (qc_approver_id, qc_approved_at, qc_notes)
+  - Created migration scripts for local development environments (migrate_inventory_transfers.py)
+  - Enhanced Stock Transfer API with proper bin allocation and batch number handling
+  - Added QC rejection functionality with proper status tracking
+  - Improved error handling and logging for SAP B1 integration
