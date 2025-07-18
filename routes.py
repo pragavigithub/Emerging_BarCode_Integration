@@ -723,6 +723,45 @@ def qc_reject_transfer(transfer_id):
         logging.error(f"Error rejecting transfer: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/inventory_transfer/<int:transfer_id>/reopen', methods=['POST'])
+@login_required
+def reopen_transfer(transfer_id):
+    """Reopen a rejected inventory transfer"""
+    try:
+        transfer = InventoryTransfer.query.get_or_404(transfer_id)
+        
+        # Check if user owns the transfer or has admin permissions
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied - You can only reopen your own transfers'}), 403
+        
+        # Check if transfer is rejected
+        if transfer.status != 'rejected':
+            return jsonify({'success': False, 'error': 'Only rejected transfers can be reopened'}), 400
+        
+        # Reset transfer to draft status
+        transfer.status = 'draft'
+        transfer.qc_approver_id = None
+        transfer.qc_approved_at = None
+        transfer.qc_notes = None
+        transfer.updated_at = datetime.utcnow()
+        
+        # Reset all items to pending
+        for item in transfer.items:
+            item.qc_status = 'pending'
+            
+        db.session.commit()
+        
+        logging.info(f"🔄 Inventory Transfer {transfer_id} reopened and reset to draft status")
+        return jsonify({
+            'success': True, 
+            'message': 'Transfer reopened successfully. You can now edit and resubmit it.',
+            'status': 'draft'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error reopening transfer: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/qc_dashboard')
 @login_required
 def qc_dashboard():
