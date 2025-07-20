@@ -250,7 +250,7 @@
                     <div class="mb-3">
                         <label for="item_code" class="form-label">Item Code <span class="text-danger">*</span></label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="item_code" name="item_code" required>
+                            <input type="text" class="form-control" id="item_code" name="item_code" required onblur="loadBatchNumbers()">
                             <button type="button" class="btn btn-outline-primary" onclick="scanItemCode()">
                                 <i data-feather="camera"></i> Scan Item
                             </button>
@@ -325,7 +325,10 @@
                     </div>
                     <div class="mb-3">
                         <label for="batch_number" class="form-label">Batch Number</label>
-                        <input type="text" class="form-control" id="batch_number" name="batch_number">
+                        <select class="form-control" id="batch_number" name="batch_number">
+                            <option value="">Select Batch Number...</option>
+                        </select>
+                        <small class="text-muted">Batch numbers will be loaded when an item code is entered</small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -343,6 +346,45 @@
 function showAddItemModal() {
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
+}
+
+function loadBatchNumbers() {
+    const itemCode = document.getElementById('item_code').value.trim();
+    const batchSelect = document.getElementById('batch_number');
+    
+    if (!itemCode) {
+        batchSelect.innerHTML = '<option value="">Select Batch Number...</option>';
+        return;
+    }
+    
+    // Show loading state
+    batchSelect.innerHTML = '<option value="">Loading batch numbers...</option>';
+    
+    // Fetch batch numbers from API
+    fetch(`/api/batch-numbers/${encodeURIComponent(itemCode)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.batches) {
+                batchSelect.innerHTML = '<option value="">Select Batch Number...</option>';
+                
+                data.batches.forEach(batch => {
+                    const option = document.createElement('option');
+                    option.value = batch.Batch;
+                    option.textContent = `${batch.Batch}${batch.ExpirationDate ? ' (Exp: ' + new Date(batch.ExpirationDate).toLocaleDateString() + ')' : ''}`;
+                    batchSelect.appendChild(option);
+                });
+                
+                if (data.batches.length === 0) {
+                    batchSelect.innerHTML = '<option value="">No batch numbers found</option>';
+                }
+            } else {
+                batchSelect.innerHTML = '<option value="">Error loading batch numbers</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading batch numbers:', error);
+            batchSelect.innerHTML = '<option value="">Error loading batch numbers</option>';
+        });
 }
 
 function addItemFromRequest(itemCode, itemName, quantity, uom, fromWarehouse, toWarehouse) {

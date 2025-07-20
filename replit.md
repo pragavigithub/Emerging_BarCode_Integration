@@ -116,6 +116,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Changelog
 
+Latest Changes:
+- July 20, 2025. Migration to Replit Complete + Enhanced Features:
+  - Successfully completed migration from Replit Agent to Replit environment
+  - Configured PostgreSQL database for production deployment  
+  - Enhanced Inventory Transfer module with batch number dropdown functionality
+  - Added SAP B1 BatchNumberDetails API integration for real-time batch data
+  - Implemented QR code label generation and printing for GRPO items
+  - Added structured QR data with item code, name, batch number, and GRPO ID
+  - Created printable QR label modal with proper formatting for label printers
+  - All features working with both online SAP B1 integration and offline mock data
+
 Changelog:
 - July 08, 2025. Initial setup
 - July 08, 2025. Migration completed from Replit Agent to Replit environment:

@@ -205,6 +205,60 @@ def grpo_detail(grpo_id):
     
     return render_template('grpo_detail.html', grpo_doc=grpo_doc, po_items=po_items)
 
+@app.route('/api/batch-numbers/<item_code>')
+@login_required
+def get_batch_numbers(item_code):
+    """Get batch numbers for specific item code"""
+    sap = SAPIntegration()
+    batches = sap.get_batch_numbers(item_code)
+    
+    return jsonify({
+        'success': True,
+        'batches': batches
+    })
+
+@app.route('/api/generate-qr-label', methods=['POST'])
+@login_required
+def generate_qr_label():
+    """Generate QR code label for GRPO item"""
+    try:
+        data = request.get_json()
+        item_code = data.get('item_code')
+        item_name = data.get('item_name')
+        batch_number = data.get('batch_number')
+        grpo_id = data.get('grpo_id')
+        
+        if not item_code:
+            return jsonify({'success': False, 'error': 'Item code is required'}), 400
+        
+        # Generate QR code data
+        qr_data = {
+            'item_code': item_code,
+            'item_name': item_name,
+            'batch_number': batch_number,
+            'grpo_id': grpo_id,
+            'created_at': datetime.utcnow().isoformat(),
+            'type': 'GRPO_ITEM'
+        }
+        
+        # Convert to QR code string
+        qr_string = json.dumps(qr_data, separators=(',', ':'))
+        
+        return jsonify({
+            'success': True,
+            'qr_data': qr_string,
+            'label_info': {
+                'item_code': item_code,
+                'item_name': item_name,
+                'batch_number': batch_number,
+                'grpo_id': grpo_id
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Error generating QR label: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/grpo/<int:grpo_id>/add_item', methods=['POST'])
 @login_required
 def add_grpo_item(grpo_id):

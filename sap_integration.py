@@ -23,6 +23,7 @@ class SAPIntegration:
         self._bin_cache = {}
         self._branch_cache = {}
         self._item_cache = {}
+        self._batch_cache = {}
         
     def login(self):
         """Login to SAP B1 Service Layer"""
@@ -418,6 +419,56 @@ class SAPIntegration:
         except Exception as e:
             logging.error(f"Error getting bin AbsEntry for {bin_code}: {str(e)}")
             return None
+
+    def get_batch_numbers(self, item_code):
+        """Get batch numbers for specific item from SAP B1 BatchNumberDetails"""
+        # Check cache first
+        if item_code in self._batch_cache:
+            return self._batch_cache[item_code]
+            
+        if not self.ensure_logged_in():
+            logging.warning(f"SAP B1 not available, returning mock batch data for {item_code}")
+            # Return mock batch data for offline mode
+            mock_batches = [
+                {
+                    "Batch": f"BATCH-{item_code}-001",
+                    "ItemCode": item_code,
+                    "Status": "bdsStatus_Released",
+                    "ExpirationDate": None,
+                    "ManufacturingDate": None,
+                    "AdmissionDate": "2025-01-01T00:00:00Z"
+                },
+                {
+                    "Batch": f"BATCH-{item_code}-002", 
+                    "ItemCode": item_code,
+                    "Status": "bdsStatus_Released",
+                    "ExpirationDate": None,
+                    "ManufacturingDate": None,
+                    "AdmissionDate": "2025-01-01T00:00:00Z"
+                }
+            ]
+            self._batch_cache[item_code] = mock_batches
+            return mock_batches
+            
+        try:
+            url = f"{self.base_url}/b1s/v1/BatchNumberDetails?$filter=ItemCode eq '{item_code}' and Status eq 'bdsStatus_Released'"
+            logging.info(f"🔍 Fetching batch numbers from SAP B1: {url}")
+            
+            response = self.session.get(url)
+            if response.status_code == 200:
+                data = response.json()
+                batches = data.get('value', [])
+                logging.info(f"📦 Found {len(batches)} batch numbers for item {item_code}")
+                
+                # Cache the results
+                self._batch_cache[item_code] = batches
+                return batches
+            else:
+                logging.warning(f"Failed to fetch batch numbers: {response.status_code} - {response.text}")
+                return []
+        except Exception as e:
+            logging.error(f"Error fetching batch numbers for {item_code}: {str(e)}")
+            return []
 
     def create_inventory_transfer(self, transfer_document):
         """Create Stock Transfer in SAP B1 with correct JSON structure"""
