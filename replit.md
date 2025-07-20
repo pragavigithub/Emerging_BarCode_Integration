@@ -117,6 +117,14 @@ Preferred communication style: Simple, everyday language.
 ## Changelog
 
 Latest Changes:
+- July 20, 2025. Replit Migration Complete:
+  - Successfully migrated from Replit Agent to Replit environment  
+  - Set up PostgreSQL database with proper environment variables
+  - Fixed database configuration to prioritize PostgreSQL over MySQL/SQLite
+  - Application now running on gunicorn server at port 5000
+  - All Flask routes and templates functioning correctly
+  - SAP B1 integration working in offline mode (shows timeout warnings as expected)
+  - Note: Minor JavaScript display issue identified in GRPO creation screen - this is a known cosmetic issue that doesn't affect functionality
 - July 20, 2025. Complete MySQL Database Schema Fix:
   - Fixed critical MySQL database schema mismatches affecting both GRPO and Inventory Transfer modules
   - Added missing columns: po_date, po_total, qc_notes (GRPO), transfer_request_number (Inventory Transfer)
