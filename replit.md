@@ -117,6 +117,13 @@ Preferred communication style: Simple, everyday language.
 ## Changelog
 
 Latest Changes:
+- July 20, 2025. Complete MySQL Database Schema Fix:
+  - Fixed critical MySQL database schema mismatches affecting both GRPO and Inventory Transfer modules
+  - Added missing columns: po_date, po_total, qc_notes (GRPO), transfer_request_number (Inventory Transfer)
+  - Created comprehensive database repair script (quick_mysql_fix.py) for immediate resolution
+  - Enhanced database connection handling with proper password encoding for special characters
+  - Updated app.py with error handling to prevent application crashes during schema issues
+  - All modules now working with MySQL for local development and PostgreSQL for Replit production
 - July 20, 2025. Migration to Replit Complete + Enhanced Features:
   - Successfully completed migration from Replit Agent to Replit environment
   - Configured PostgreSQL database for production deployment  

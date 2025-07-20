@@ -102,7 +102,7 @@ def fix_mysql_directly():
             # Create other essential tables
             logger.info("🔧 Creating other tables...")
             
-            # GRPO Documents
+            # GRPO Documents - Complete schema
             cursor.execute("DROP TABLE IF EXISTS grpo_documents")
             cursor.execute("""
                 CREATE TABLE grpo_documents (
@@ -110,9 +110,12 @@ def fix_mysql_directly():
                     po_number VARCHAR(50) NOT NULL,
                     supplier_code VARCHAR(50),
                     supplier_name VARCHAR(100),
+                    po_date DATETIME,
+                    po_total DECIMAL(15,2),
                     status VARCHAR(20) DEFAULT 'draft',
                     draft_or_post VARCHAR(10) DEFAULT 'draft',
                     notes TEXT,
+                    qc_notes TEXT,
                     sap_document_number VARCHAR(50),
                     user_id INT,
                     qc_user_id INT,
@@ -148,12 +151,13 @@ def fix_mysql_directly():
             """)
             logger.info("✅ GRPO items table created")
             
-            # Inventory Transfers
+            # Inventory Transfers - Complete schema with all missing columns
             cursor.execute("DROP TABLE IF EXISTS inventory_transfers")
             cursor.execute("""
                 CREATE TABLE inventory_transfers (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     transfer_number VARCHAR(50) NOT NULL,
+                    transfer_request_number VARCHAR(50),
                     from_warehouse_code VARCHAR(10),
                     to_warehouse_code VARCHAR(10),
                     status VARCHAR(20) DEFAULT 'draft',
