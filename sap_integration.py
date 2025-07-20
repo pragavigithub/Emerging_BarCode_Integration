@@ -519,7 +519,7 @@ class SAPIntegration:
             if base_entry:
                 line["BaseEntry"] = base_entry
                 line["BaseLine"] = base_line
-                line["BaseType"] = "InventoryTransferRequest"  # oInventoryTransferRequest
+                line["BaseType"] = "1250000001"  # oInventoryTransferRequest
                 
             # Add pricing if available
             if price > 0:
@@ -539,22 +539,22 @@ class SAPIntegration:
                 }]
             
             # Add bin allocation if bins are specified
-            if item.from_bin or item.to_bin:
-                line["BinAllocation"] = []
-                
-                if item.from_bin:
-                    line["BinAllocation"].append({
-                        "BinActionType": "batFromWarehouse",
-                        "BinAbsEntry": self.get_bin_abs_entry(item.from_bin, transfer_document.from_warehouse),
-                        "Quantity": float(item.quantity)
-                    })
-                    
-                if item.to_bin:
-                    line["BinAllocation"].append({
-                        "BinActionType": "batToWarehouse", 
-                        "BinAbsEntry": self.get_bin_abs_entry(item.to_bin, transfer_document.to_warehouse),
-                        "Quantity": float(item.quantity)
-                    })
+            # if item.from_bin or item.to_bin:
+            #     line["BinAllocation"] = []
+            #
+            #     if item.from_bin:
+            #         line["BinAllocation"].append({
+            #             "BinActionType": "batFromWarehouse",
+            #             "BinAbsEntry": self.get_bin_abs_entry(item.from_bin, transfer_document.from_warehouse),
+            #             "Quantity": float(item.quantity)
+            #         })
+            #
+            #     if item.to_bin:
+            #         line["BinAllocation"].append({
+            #             "BinActionType": "batToWarehouse",
+            #             "BinAbsEntry": self.get_bin_abs_entry(item.to_bin, transfer_document.to_warehouse),
+            #             "Quantity": float(item.quantity)
+            #         })
             
             stock_transfer_lines.append(line)
         
@@ -562,7 +562,7 @@ class SAPIntegration:
             "DocDate": datetime.now().strftime('%Y-%m-%d'),
             "Comments": f"QC Approved WMS Transfer {transfer_document.id} by {transfer_document.qc_approver.username if transfer_document.qc_approver else 'System'}",
             "FromWarehouse": transfer_document.from_warehouse,
-            "ToFromWarehouse":transfer_document.to_warehouse,
+            "ToWarehouse":transfer_document.to_warehouse,
             "StockTransferLines": stock_transfer_lines
         }
         print(transfer_data)
