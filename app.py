@@ -35,28 +35,30 @@ app.secret_key = os.environ.get(
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure database with multiple database support
-# Priority: MySQL > PostgreSQL > SQLite (fallback)
+# Priority: PostgreSQL (Replit) > MySQL > SQLite (fallback)
 database_url = None
 db_type = "unknown"
 
-# Check for MySQL configuration
-mysql_host = os.environ.get("MYSQL_HOST")
-mysql_user = os.environ.get("MYSQL_USER")
-mysql_password = os.environ.get("MYSQL_PASSWORD")
-mysql_database = os.environ.get("MYSQL_DATABASE")
-
-if mysql_host and mysql_user and mysql_password and mysql_database:
-    # MySQL configuration with proper URL encoding
-    from urllib.parse import quote_plus
-    encoded_password = quote_plus(mysql_password)
-    database_url = f"mysql+pymysql://{mysql_user}:{encoded_password}@{mysql_host}/{mysql_database}"
-    db_type = "mysql"
-    logging.info("✅ Using MySQL database")
-elif os.environ.get("DATABASE_URL"):
+# Check for PostgreSQL configuration first (Replit environment)
+if os.environ.get("DATABASE_URL"):
     # PostgreSQL configuration (Replit environment)
     database_url = os.environ.get("DATABASE_URL")
     db_type = "postgresql"
     logging.info("✅ Using PostgreSQL database for Replit deployment")
+else:
+    # Check for MySQL configuration for local development
+    mysql_host = os.environ.get("MYSQL_HOST")
+    mysql_user = os.environ.get("MYSQL_USER")
+    mysql_password = os.environ.get("MYSQL_PASSWORD")
+    mysql_database = os.environ.get("MYSQL_DATABASE")
+
+    if mysql_host and mysql_user and mysql_password and mysql_database:
+        # MySQL configuration with proper URL encoding
+        from urllib.parse import quote_plus
+        encoded_password = quote_plus(mysql_password)
+        database_url = f"mysql+pymysql://{mysql_user}:{encoded_password}@{mysql_host}/{mysql_database}"
+        db_type = "mysql"
+        logging.info("✅ Using MySQL database")
 
 if database_url:
     # Production database configuration
@@ -67,7 +69,11 @@ if database_url:
         "pool_size": 10,
         "max_overflow": 20
     }
-    logging.info(f"Database URL configured: {database_url.replace(encoded_password, '***') if 'encoded_password' in locals() else database_url}")
+    # Mask password in logs for security
+    masked_url = database_url
+    if 'encoded_password' in locals() and encoded_password:
+        masked_url = database_url.replace(encoded_password, '***')
+    logging.info(f"Database URL configured: {masked_url}")
 else:
     # Local development fallback - create SQLite database with proper path handling
     import tempfile
@@ -109,7 +115,7 @@ app.config["DB_TYPE"] = db_type
 # Initialize extensions with app
 db.init_app(app)
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'login'  # type: ignore
 login_manager.login_message = 'Please log in to access this page.'
 
 # SAP B1 Configuration
