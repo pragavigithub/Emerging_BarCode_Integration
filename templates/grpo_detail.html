@@ -91,26 +91,26 @@
                             <tbody>
                                 {% for po_item in po_items %}
                                 <tr>
-                                    <td><strong>{{ po_item['ItemCode'] }}</strong></td>
-                                    <td>{{ po_item['ItemDescription'] or 'N/A' }}</td>
-                                    <td>{{ po_item['Quantity'] }}</td>
-                                    <td>{{ po_item['OpenQuantity'] }}</td>
-                                    <td>{{ po_item['UoMCode'] or po_item['UoMEntry'] or 'EA' }}</td>
-                                    <td>${{ "%.2f"|format(po_item['Price']|float) }}</td>
+                                    <td><strong>{{ po_item.get('ItemCode', '') }}</strong></td>
+                                    <td>{{ po_item.get('ItemDescription', 'N/A') }}</td>
+                                    <td>{{ po_item.get('Quantity', 0) }}</td>
+                                    <td>{{ po_item.get('OpenQuantity', po_item.get('OpenQty', 0)) }}</td>
+                                    <td>{{ po_item.get('UoMCode', po_item.get('UoMEntry', 'EA')) }}</td>
+                                    <td>${{ "%.2f"|format(po_item.get('Price', 0)|float) }}</td>
                                     <td>
-                                        {% if po_item['LineStatus'] == 'bost_Open' %}
+                                        {% if po_item.get('LineStatus') == 'bost_Open' %}
                                             <span class="badge bg-success">Open</span>
                                         {% else %}
-                                            <span class="badge bg-secondary">{{ po_item['LineStatus'] }}</span>
+                                            <span class="badge bg-secondary">{{ po_item.get('LineStatus', 'Unknown') }}</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if po_item['LineStatus'] == 'bost_Open' and po_item['OpenQuantity'] > 0 %}
+                                        {% if po_item.get('LineStatus') == 'bost_Open' and po_item.get('OpenQuantity', po_item.get('OpenQty', 0)) > 0 %}
                                             <button class="btn btn-sm btn-primary add-item-btn"
-                                                    data-item-code="{{ po_item['ItemCode'] }}"
-                                                    data-item-name="{{ po_item['ItemDescription'] or 'N/A' }}"
-                                                    data-uom="{{ po_item['UoMCode'] or po_item['UoMEntry'] or 'EA' }}"
-                                                    data-warehouse="{{ po_item['WarehouseCode'] or 'WH001' }}"
+                                                    data-item-code="{{ po_item.get('ItemCode', '') }}"
+                                                    data-item-name="{{ po_item.get('ItemDescription', 'N/A') }}"
+                                                    data-uom="{{ po_item.get('UoMCode', po_item.get('UoMEntry', 'EA')) }}"
+                                                    data-warehouse="{{ po_item.get('WarehouseCode', 'WH001') }}"
                                                     data-po-item="{{ po_item|tojson|e }}">
                                                 <i data-feather="plus"></i> Add
                                             </button>
