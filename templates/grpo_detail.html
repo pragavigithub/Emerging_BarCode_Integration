@@ -1089,6 +1089,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const warehouse = this.getAttribute('data-warehouse');
             const poItemJson = this.getAttribute('data-po-item');
             
+            console.log('📋 Button data:', {
+                itemCode, itemName, uom, warehouse, poItemJson
+            });
+            
+            // Validate required data
+            if (!itemCode) {
+                console.error('❌ Missing item code');
+                alert('Error: Item code is missing');
+                return;
+            }
+            
             console.log('📦 Item data:', {itemCode, itemName, uom, warehouse});
             
             let poItemData = null;

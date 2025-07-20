@@ -163,19 +163,24 @@ with app.app_context():
         except Exception as e:
             logging.warning(f"Schema migration warning: {e}")
 
-    # Create default branch
-    default_branch = models_extensions.Branch.query.filter_by(id='BR001').first()
-    if not default_branch:
-        default_branch = models_extensions.Branch(
-            id='BR001',
-            name='Main Branch',
-            address='Main Office',
-            is_active=True,
-            is_default=True
-        )
-        db.session.add(default_branch)
-        db.session.commit()
-        logging.info("Default branch created")
+    # Create default branch (with error handling for MySQL)
+    try:
+        default_branch = models_extensions.Branch.query.filter_by(id='BR001').first()
+        if not default_branch:
+            default_branch = models_extensions.Branch(
+                id='BR001',
+                name='Main Branch',
+                address='Main Office',
+                is_active=True,
+                is_default=True
+            )
+            db.session.add(default_branch)
+            db.session.commit()
+            logging.info("Default branch created")
+    except Exception as e:
+        logging.warning(f"Could not create/query default branch: {e}")
+        logging.info("Please run fix_mysql_database.py to fix database schema")
+        # Continue with application startup
 
     # Create default admin user
     from werkzeug.security import generate_password_hash

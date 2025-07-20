@@ -451,13 +451,24 @@ function removeItem(itemId) {
 
 function editItem(itemId, itemCode, itemName, quantity, uom, fromBin, toBin, batchNumber) {
     // Pre-fill the edit modal with current item data
-    document.getElementById('item_code').value = itemCode;
-    document.getElementById('item_name').value = itemName;
-    document.getElementById('quantity').value = quantity;
-    document.getElementById('unit_of_measure').value = uom;
-    document.getElementById('from_bin').value = fromBin;
-    document.getElementById('to_bin').value = toBin;
-    document.getElementById('batch_number').value = batchNumber;
+    document.getElementById('item_code').value = itemCode || '';
+    document.getElementById('item_name').value = itemName || '';
+    document.getElementById('quantity').value = quantity || '';
+    document.getElementById('unit_of_measure').value = uom || 'EA';
+    document.getElementById('from_bin').value = fromBin || '';
+    document.getElementById('to_bin').value = toBin || '';
+    
+    // Handle batch number dropdown
+    const batchSelect = document.getElementById('batch_number');
+    batchSelect.innerHTML = `<option value="${batchNumber || ''}" selected>${batchNumber || 'Select Batch Number...'}</option>`;
+    
+    // Load fresh batch numbers if item code is available
+    if (itemCode) {
+        loadBatchNumbers();
+        setTimeout(() => {
+            batchSelect.value = batchNumber || '';
+        }, 1000);
+    }
     
     // Change form action to edit mode
     const form = document.getElementById('addItemForm');
