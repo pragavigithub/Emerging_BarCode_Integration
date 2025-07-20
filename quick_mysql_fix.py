@@ -125,47 +125,48 @@ def fix_mysql_directly():
             """)
             logger.info("✅ GRPO documents table created")
             
-            # GRPO Items
+            # GRPO Items - Complete schema with ALL missing columns
             cursor.execute("DROP TABLE IF EXISTS grpo_items")
             cursor.execute("""
                 CREATE TABLE grpo_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     grpo_document_id INT,
+                    po_line_number INT,
                     item_code VARCHAR(50) NOT NULL,
-                    item_name VARCHAR(100),
-                    received_quantity DECIMAL(10,3) DEFAULT 0,
+                    item_name VARCHAR(200),
                     po_quantity DECIMAL(10,3),
                     open_quantity DECIMAL(10,3),
+                    received_quantity DECIMAL(10,3) DEFAULT 0,
                     unit_of_measure VARCHAR(10),
+                    unit_price DECIMAL(15,2),
                     bin_location VARCHAR(50),
                     batch_number VARCHAR(50),
                     serial_number VARCHAR(50),
-                    expiration_date DATE,
+                    expiration_date DATETIME,
                     supplier_barcode VARCHAR(100),
                     generated_barcode VARCHAR(100),
                     barcode_printed BOOLEAN DEFAULT FALSE,
                     qc_status VARCHAR(20) DEFAULT 'pending',
-                    po_line_number INT,
+                    qc_notes TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             logger.info("✅ GRPO items table created")
             
-            # Inventory Transfers - Complete schema with all missing columns
+            # Inventory Transfers - Complete schema with ALL missing columns
             cursor.execute("DROP TABLE IF EXISTS inventory_transfers")
             cursor.execute("""
                 CREATE TABLE inventory_transfers (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    transfer_number VARCHAR(50) NOT NULL,
-                    transfer_request_number VARCHAR(50),
-                    from_warehouse_code VARCHAR(10),
-                    to_warehouse_code VARCHAR(10),
-                    status VARCHAR(20) DEFAULT 'draft',
+                    transfer_request_number VARCHAR(50) NOT NULL,
                     sap_document_number VARCHAR(50),
+                    status VARCHAR(20) DEFAULT 'draft',
                     user_id INT,
                     qc_approver_id INT,
                     qc_approved_at TIMESTAMP NULL,
                     qc_notes TEXT,
+                    from_warehouse VARCHAR(20),
+                    to_warehouse VARCHAR(20),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )

@@ -8,8 +8,13 @@ Your MySQL database is missing these critical columns:
 - `po_total` (DECIMAL)
 - `qc_notes` (TEXT)
 
+### GRPO Items Table Missing:
+- `unit_price` (DECIMAL)
+
 ### Inventory Transfers Table Missing:
 - `transfer_request_number` (VARCHAR)
+- `from_warehouse` (VARCHAR)
+- `to_warehouse` (VARCHAR)
 
 ## ✅ COMPLETE FIX SOLUTION:
 
@@ -38,8 +43,13 @@ Your MySQL database is missing these critical columns:
    ALTER TABLE grpo_documents ADD COLUMN po_total DECIMAL(15,2);
    ALTER TABLE grpo_documents ADD COLUMN qc_notes TEXT;
    
+   -- Fix GRPO Items
+   ALTER TABLE grpo_items ADD COLUMN unit_price DECIMAL(15,2);
+   
    -- Fix Inventory Transfers  
    ALTER TABLE inventory_transfers ADD COLUMN transfer_request_number VARCHAR(50);
+   ALTER TABLE inventory_transfers ADD COLUMN from_warehouse VARCHAR(20);
+   ALTER TABLE inventory_transfers ADD COLUMN to_warehouse VARCHAR(20);
    ```
 
 ### For Replit (Production):
