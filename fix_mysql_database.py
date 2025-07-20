@@ -19,10 +19,15 @@ def get_mysql_connection():
     mysql_host = os.environ.get('MYSQL_HOST', 'localhost')
     mysql_port = os.environ.get('MYSQL_PORT', '3306')
     mysql_user = os.environ.get('MYSQL_USER', 'root')
-    mysql_password = os.environ.get('MYSQL_PASSWORD', '')
-    mysql_database = os.environ.get('MYSQL_DATABASE', 'wms_db')
+    mysql_password = os.environ.get('MYSQL_PASSWORD', 'root@123')
+    mysql_database = os.environ.get('MYSQL_DATABASE', 'wms_db_dev')
     
-    connection_string = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
+    # Handle password with special characters - URL encode if needed
+    from urllib.parse import quote_plus
+    encoded_password = quote_plus(mysql_password)
+    
+    connection_string = f"mysql+pymysql://{mysql_user}:{encoded_password}@{mysql_host}:{mysql_port}/{mysql_database}"
+    logger.info(f"Connecting to MySQL: {mysql_user}@{mysql_host}:{mysql_port}/{mysql_database}")
     return create_engine(connection_string)
 
 def fix_branches_table(engine):

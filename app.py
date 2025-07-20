@@ -182,21 +182,26 @@ with app.app_context():
         logging.info("Please run fix_mysql_database.py to fix database schema")
         # Continue with application startup
 
-    # Create default admin user
-    from werkzeug.security import generate_password_hash
-    admin = models.User.query.filter_by(username='admin').first()
-    if not admin:
-        admin = models.User(username='admin',
-                            email='admin@company.com',
-                            password_hash=generate_password_hash('admin123'),
-                            first_name='System',
-                            last_name='Administrator',
-                            role='admin',
-                            branch_id='BR001',
-                            default_branch_id='BR001')
-        db.session.add(admin)
-        db.session.commit()
-        logging.info("Default admin user created")
+    # Create default admin user (with error handling for MySQL)
+    try:
+        from werkzeug.security import generate_password_hash
+        admin = models.User.query.filter_by(username='admin').first()
+        if not admin:
+            admin = models.User(username='admin',
+                                email='admin@company.com',
+                                password_hash=generate_password_hash('admin123'),
+                                first_name='System',
+                                last_name='Administrator',
+                                role='admin',
+                                branch_id='BR001',
+                                default_branch_id='BR001')
+            db.session.add(admin)
+            db.session.commit()
+            logging.info("Default admin user created")
+    except Exception as e:
+        logging.warning(f"Could not create/query admin user: {e}")
+        logging.info("Please run quick_mysql_fix.py to fix database schema")
+        # Continue with application startup
 
 # Import routes to register them
 import routes
