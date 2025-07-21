@@ -117,6 +117,16 @@ Preferred communication style: Simple, everyday language.
 ## Changelog
 
 Latest Changes:
+- July 21, 2025. Database Connection Fix & MySQL Migration Created:
+  - Fixed critical database connection issue by commenting out MySQL variables in .env file
+  - Application now properly connects to PostgreSQL database in Replit environment
+  - Fixed MySQL detection logic in app.py to prevent connection attempts when MySQL not configured
+  - Created comprehensive MySQL migration file (mysql_complete_migration.py) for users with MySQL setup
+  - Migration script fixes missing qc_status and qc_notes columns in inventory_transfer_items table
+  - Added complete MySQL schema migration covering all tables (users, grpo_documents, grpo_items, inventory_transfers, inventory_transfer_items, pick_lists, inventory_counts, barcode_labels)
+  - Created helper scripts: run_mysql_migration.py and detailed README_MYSQL_MIGRATION.md
+  - Application running successfully on PostgreSQL with gunicorn server
+  - Fixed type errors in database configuration code for better code quality
 - July 21, 2025. User Requirements Implementation:
   - Database Priority Updated: Changed database connection priority to prioritize MySQL over PostgreSQL as per user preference for local development
   - Inventory Transfer Batch Input: Modified batch number input from dropdown to textbox in inventory transfer screen (both add and edit modes)

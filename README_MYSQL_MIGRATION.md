@@ -1,184 +1,159 @@
-# MySQL Database Migration Guide
+# MySQL Migration Guide for WMS
 
 ## Overview
-This guide helps you migrate your WMS application from SQLite to MySQL for better performance and enterprise-level features.
+This guide helps you set up and migrate your MySQL database for the WMS (Warehouse Management System) application.
 
-## 🚀 Quick Setup
+## Quick Fix (Single File Migration)
 
-### Option 1: Automated Setup (Recommended)
+### Step 1: Set MySQL Environment Variables
 ```bash
-# Run the MySQL setup script
-python setup_mysql_local.py
-
-# Run the migration
-python migrate_inventory_transfers.py
+export MYSQL_HOST=localhost
+export MYSQL_USER=root
+export MYSQL_PASSWORD=your_password
+export MYSQL_DATABASE=wms_db_dev
 ```
 
-### Option 2: Manual Setup
-
-#### Step 1: Install MySQL Python Packages
-```bash
-pip install pymysql mysql-connector-python
+Or create a `.env` file with:
 ```
-
-#### Step 2: Create MySQL Database
-```sql
--- Login to MySQL as root
-mysql -u root -p
-
--- Create database
-CREATE DATABASE warehouse_wms;
-
--- Create user (optional)
-CREATE USER 'wms_user'@'localhost' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON warehouse_wms.* TO 'wms_user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-#### Step 3: Configure Environment Variables
-Create or update your `.env` file:
-```bash
-# MySQL Database Configuration
 MYSQL_HOST=localhost
-MYSQL_USER=wms_user
+MYSQL_USER=root
 MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=warehouse_wms
-
-# Flask Session Secret
-SESSION_SECRET=your-secret-key-here
-
-# SAP B1 Configuration (optional)
-SAP_B1_SERVER=https://your-sap-server:50000
-SAP_B1_USERNAME=your-sap-username
-SAP_B1_PASSWORD=your-sap-password
-SAP_B1_COMPANY_DB=your-company-database
+MYSQL_DATABASE=wms_db_dev
 ```
 
-#### Step 4: Run Migration
+### Step 2: Run the Complete Migration
 ```bash
-python migrate_inventory_transfers.py
+python mysql_complete_migration.py
 ```
 
-## 📊 Database Priority System
-
-The application automatically detects and uses databases in this order:
-
-1. **MySQL** - If `MYSQL_*` environment variables are set
-2. **PostgreSQL** - If `DATABASE_URL` is set (Replit environment)
-3. **SQLite** - Fallback for local development
-
-## 🔄 Migration Features
-
-### What the Migration Does:
-- Detects your current database type (MySQL/PostgreSQL/SQLite)
-- Adds missing QC approval columns to `inventory_transfers` table
-- Adds QC workflow columns to `inventory_transfer_items` table
-- Creates tables if they don't exist
-- Handles different SQL syntax for each database type
-
-### Added Columns:
-**inventory_transfers table:**
-- `qc_approver_id` (INT/INTEGER)
-- `qc_approved_at` (DATETIME/TIMESTAMP)
-- `qc_notes` (TEXT)
-- `from_warehouse` (VARCHAR(20))
-- `to_warehouse` (VARCHAR(20))
-
-**inventory_transfer_items table:**
-- `qc_status` (VARCHAR(20) DEFAULT 'pending')
-- `qc_notes` (TEXT)
-
-## 🛠️ Troubleshooting
-
-### MySQL Connection Issues
+Or use the helper script:
 ```bash
-# Check MySQL service status
-sudo systemctl status mysql
-
-# Start MySQL service
-sudo systemctl start mysql
-
-# Connect to MySQL
-mysql -u root -p
+python run_mysql_migration.py
 ```
 
-### Permission Issues
-```sql
--- Grant all privileges to user
-GRANT ALL PRIVILEGES ON warehouse_wms.* TO 'wms_user'@'localhost';
-FLUSH PRIVILEGES;
-```
+## What the Migration Does
 
-### Port Issues
+The `mysql_complete_migration.py` script will:
+
+### ✅ Fix Missing Columns in inventory_transfer_items
+- `qc_status` (VARCHAR(20)) - Quality control status (pending/approved/rejected)
+- `qc_notes` (TEXT) - Quality control notes
+- `serial_number` (VARCHAR(50)) - Item serial number
+- `expiry_date` (DATE) - Item expiry date
+- `manufacture_date` (DATE) - Item manufacture date
+- `unit_price` (DECIMAL(15,4)) - Unit price
+- `total_value` (DECIMAL(15,2)) - Total value
+- `from_warehouse_code` (VARCHAR(10)) - From warehouse code
+- `to_warehouse_code` (VARCHAR(10)) - To warehouse code
+- `base_entry` (INT) - SAP base entry reference
+- `base_line` (INT) - SAP base line reference
+- `sap_line_number` (INT) - SAP line number
+- `updated_at` (DATETIME) - Last update timestamp
+
+### ✅ Fix Missing Columns in inventory_transfers
+- `transfer_request_number` (VARCHAR(50)) - Transfer request number
+- `from_warehouse` (VARCHAR(20)) - Source warehouse
+- `to_warehouse` (VARCHAR(20)) - Destination warehouse
+- `transfer_type` (VARCHAR(20)) - Transfer type (warehouse/bin/emergency)
+- `priority` (VARCHAR(10)) - Transfer priority (low/normal/high/urgent)
+- `reason_code` (VARCHAR(20)) - Reason code for transfer
+- `notes` (TEXT) - Transfer notes
+- `qc_approver_id` (INT) - QC approver user ID
+- `qc_approved_at` (DATETIME) - QC approval timestamp
+- `qc_notes` (TEXT) - QC approval notes
+
+### ✅ Fix Missing Columns in grpo_documents
+- `po_date` (DATE) - Purchase order date
+- `po_total` (DECIMAL(15,2)) - Purchase order total
+- `qc_notes` (TEXT) - QC notes
+- `notes` (TEXT) - General notes
+- `branch_id` (VARCHAR(10)) - Branch ID
+- `reference_number` (VARCHAR(50)) - Reference number
+- `vendor_code` (VARCHAR(50)) - Vendor code
+- `vendor_name` (VARCHAR(200)) - Vendor name
+- `delivery_note_number` (VARCHAR(50)) - Delivery note number
+- `invoice_number` (VARCHAR(50)) - Invoice number
+- `currency` (VARCHAR(3)) - Currency code
+
+### ✅ Fix Missing Columns in grpo_items
+- `serial_number` (VARCHAR(50)) - Serial number
+- `expiry_date` (DATE) - Expiry date
+- `manufacture_date` (DATE) - Manufacture date
+- `unit_price` (DECIMAL(15,4)) - Unit price
+- `line_total` (DECIMAL(15,2)) - Line total
+- `tax_rate` (DECIMAL(5,2)) - Tax rate
+- `tax_amount` (DECIMAL(15,2)) - Tax amount
+- `discount_percent` (DECIMAL(5,2)) - Discount percentage
+- `discount_amount` (DECIMAL(15,2)) - Discount amount
+- `qc_notes` (TEXT) - QC notes
+- `barcode` (VARCHAR(100)) - Barcode
+
+### ✅ Fix Missing Columns in users
+- `first_name` (VARCHAR(50)) - First name
+- `last_name` (VARCHAR(50)) - Last name
+- `role` (VARCHAR(20)) - User role
+- `is_active` (BOOLEAN) - Active status
+- `branch_id` (VARCHAR(10)) - Branch ID
+- `default_branch_id` (VARCHAR(10)) - Default branch ID
+- `phone` (VARCHAR(20)) - Phone number
+- `created_at` (DATETIME) - Creation timestamp
+- `updated_at` (DATETIME) - Update timestamp
+- `last_login` (DATETIME) - Last login timestamp
+- `failed_login_attempts` (INT) - Failed login attempts
+- `locked_until` (DATETIME) - Account lock until
+
+### ✅ Create Missing Tables
+- `branches` - Branch management
+- `user_sessions` - User session tracking
+
+### ✅ Create Performance Indexes
+- Indexes for all major tables to improve query performance
+
+## Error Resolution
+
+### Error: "Unknown column 'qc_status' in 'field list'"
+This error occurs when the `inventory_transfer_items` table is missing the `qc_status` column.
+
+**Solution:** Run the migration script:
 ```bash
-# Check if MySQL is running on port 3306
-netstat -an | grep 3306
-
-# Or check MySQL configuration
-sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
+python mysql_complete_migration.py
 ```
 
-## 🔧 Fix Scripts Available
+### Error: "Can't connect to MySQL server"
+This error occurs when MySQL environment variables are not set correctly.
 
-### For Database Schema Issues:
-1. **migrate_inventory_transfers.py** - Complete migration with table creation
-2. **fix_inventory_transfer_schema.py** - Quick column addition fix
-3. **run_database_fix.bat** - Interactive fix menu (Windows)
+**Solution:** 
+1. Set environment variables correctly
+2. Ensure MySQL server is running
+3. Check username/password credentials
 
-### For MySQL Setup:
-1. **setup_mysql_local.py** - Interactive MySQL configuration
-2. **install_mysql_local.py** - Package installation and basic setup
+### Error: "Access denied for user"
+This error occurs when MySQL credentials are incorrect.
 
-## 🎯 Benefits of MySQL Migration
+**Solution:** 
+1. Check username and password
+2. Ensure user has CREATE/ALTER permissions
+3. Create the database if it doesn't exist
 
-### Performance Benefits:
-- Better concurrent access handling
-- Improved query performance for large datasets
-- Professional database engine with optimization features
+## After Migration
 
-### Enterprise Features:
-- Better backup and recovery options
-- User management and permissions
-- Replication and high availability support
-- Better integration with enterprise tools
+After successful migration:
+1. Restart your WMS application
+2. The application should connect to MySQL successfully
+3. All inventory transfer functionality should work properly
 
-### Development Benefits:
-- More compatible with production environments
-- Better debugging and monitoring tools
-- Support for stored procedures and functions
-- More robust transaction handling
-
-## 📋 Post-Migration Verification
-
-After migration, verify the setup:
-
-1. **Check Database Connection:**
-   ```bash
-   python -c "from migrate_inventory_transfers import get_database_connection; print(get_database_connection())"
-   ```
-
-2. **Verify Tables:**
-   ```sql
-   USE warehouse_wms;
-   SHOW TABLES;
-   DESCRIBE inventory_transfers;
-   DESCRIBE inventory_transfer_items;
-   ```
-
-3. **Test Application:**
-   ```bash
-   python app.py
-   # Access inventory transfer module
-   # Create a test transfer
-   # Submit for QC approval
-   ```
-
-## 🆘 Support
+## Troubleshooting
 
 If you encounter issues:
-1. Check MySQL service is running
-2. Verify database credentials
-3. Run the migration script again
-4. Check application logs for detailed error messages
+1. Check MySQL server is running
+2. Verify environment variables are set correctly
+3. Ensure user has proper database permissions
+4. Check the application logs for specific error messages
 
-The migration scripts are designed to be safe and can be run multiple times without issues.
+## Support Files Created
+
+- `mysql_complete_migration.py` - Complete migration script
+- `run_mysql_migration.py` - Helper script to run migration
+- This README file for documentation
+
+For additional help, check the application logs or contact support.
