@@ -41,14 +41,14 @@ db_type = "unknown"
 
 # Check for MySQL configuration first (user preference for local development)
 mysql_host = os.environ.get("MYSQL_HOST")
-mysql_user = os.environ.get("MYSQL_USER")
+mysql_user = os.environ.get("MYSQL_USER") 
 mysql_password = os.environ.get("MYSQL_PASSWORD")
 mysql_database = os.environ.get("MYSQL_DATABASE")
 
-if mysql_host and mysql_user and mysql_password and mysql_database:
+if all([mysql_host, mysql_user, mysql_password, mysql_database]):
     # MySQL configuration with proper URL encoding
     from urllib.parse import quote_plus
-    encoded_password = quote_plus(mysql_password)
+    encoded_password = quote_plus(str(mysql_password))
     database_url = f"mysql+pymysql://{mysql_user}:{encoded_password}@{mysql_host}/{mysql_database}"
     db_type = "mysql"
     logging.info("✅ Using MySQL database (user preference)")
@@ -69,7 +69,7 @@ if database_url:
     }
     # Mask password in logs for security
     masked_url = database_url
-    if 'encoded_password' in locals() and encoded_password:
+    if 'encoded_password' in locals():
         masked_url = database_url.replace(encoded_password, '***')
     logging.info(f"Database URL configured: {masked_url}")
 else:
@@ -169,15 +169,15 @@ with app.app_context():
 
     # Create default branch (with error handling for MySQL)
     try:
-        default_branch = models_extensions.Branch.query.filter_by(id='BR001').first()
+        from models_extensions import Branch
+        default_branch = Branch.query.filter_by(id='BR001').first()
         if not default_branch:
-            default_branch = models_extensions.Branch(
-                id='BR001',
-                name='Main Branch',
-                address='Main Office',
-                is_active=True,
-                is_default=True
-            )
+            default_branch = Branch()
+            default_branch.id = 'BR001'
+            default_branch.name = 'Main Branch'
+            default_branch.address = 'Main Office'
+            default_branch.is_active = True
+            default_branch.is_default = True
             db.session.add(default_branch)
             db.session.commit()
             logging.info("Default branch created")
@@ -189,16 +189,18 @@ with app.app_context():
     # Create default admin user (with error handling for MySQL)
     try:
         from werkzeug.security import generate_password_hash
-        admin = models.User.query.filter_by(username='admin').first()
+        from models import User
+        admin = User.query.filter_by(username='admin').first()
         if not admin:
-            admin = models.User(username='admin',
-                                email='admin@company.com',
-                                password_hash=generate_password_hash('admin123'),
-                                first_name='System',
-                                last_name='Administrator',
-                                role='admin',
-                                branch_id='BR001',
-                                default_branch_id='BR001')
+            admin = User()
+            admin.username = 'admin'
+            admin.email = 'admin@company.com'
+            admin.password_hash = generate_password_hash('admin123')
+            admin.first_name = 'System'
+            admin.last_name = 'Administrator'
+            admin.role = 'admin'
+            admin.branch_id = 'BR001'
+            admin.default_branch_id = 'BR001'
             db.session.add(admin)
             db.session.commit()
             logging.info("Default admin user created")
