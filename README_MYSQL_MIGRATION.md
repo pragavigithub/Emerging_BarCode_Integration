@@ -21,7 +21,13 @@ MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=wms_db_dev
 ```
 
-### Step 2: Run the Complete Migration
+### Step 2: Fix Foreign Key Constraints (If Needed)
+If you get foreign key constraint errors like "incompatible", run this first:
+```bash
+python mysql_fix_foreign_keys.py
+```
+
+### Step 3: Run the Complete Migration
 ```bash
 python mysql_complete_migration.py
 ```
@@ -135,6 +141,18 @@ This error occurs when MySQL credentials are incorrect.
 2. Ensure user has CREATE/ALTER permissions
 3. Create the database if it doesn't exist
 
+### Error: "Referencing column 'branch_id' and referenced column 'id' in foreign key constraint are incompatible"
+This error occurs when foreign key columns have incompatible data types or character sets.
+
+**Solution:** Run the foreign key fix script first:
+```bash
+python mysql_fix_foreign_keys.py
+```
+Then run the main migration:
+```bash
+python mysql_complete_migration.py
+```
+
 ## After Migration
 
 After successful migration:
@@ -153,7 +171,17 @@ If you encounter issues:
 ## Support Files Created
 
 - `mysql_complete_migration.py` - Complete migration script
-- `run_mysql_migration.py` - Helper script to run migration
+- `mysql_fix_foreign_keys.py` - Foreign key constraint fix script
+- `run_mysql_migration.py` - Helper script to run migration  
 - This README file for documentation
+
+## Migration Order (For Foreign Key Issues)
+
+If you encounter the foreign key constraint error:
+
+1. **First:** `python mysql_fix_foreign_keys.py`
+2. **Then:** `python mysql_complete_migration.py`
+
+This ensures all foreign key constraints are compatible before adding new columns.
 
 For additional help, check the application logs or contact support.

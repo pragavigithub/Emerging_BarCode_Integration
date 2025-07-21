@@ -245,9 +245,28 @@ def migrate_barcode_labels_table(cursor):
     for column_name, column_definition in columns_to_add:
         add_column_if_not_exists(cursor, 'barcode_labels', column_name, column_definition)
 
+def fix_foreign_key_constraints(cursor):
+    """Fix foreign key constraint issues by temporarily disabling checks"""
+    try:
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+        logger.info("✅ Disabled foreign key checks temporarily")
+    except Exception as e:
+        logger.warning(f"Could not disable foreign key checks: {e}")
+
+def restore_foreign_key_constraints(cursor):
+    """Restore foreign key constraint checks"""
+    try:
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+        logger.info("✅ Re-enabled foreign key checks")
+    except Exception as e:
+        logger.warning(f"Could not re-enable foreign key checks: {e}")
+
 def create_missing_tables(cursor):
     """Create any missing tables"""
     logger.info("🔄 Checking for missing tables...")
+    
+    # Disable foreign key checks temporarily
+    fix_foreign_key_constraints(cursor)
     
     # Branches table
     if not table_exists(cursor, 'branches'):
@@ -264,7 +283,7 @@ def create_missing_tables(cursor):
                 is_default BOOLEAN DEFAULT FALSE,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
         logger.info("✅ Created branches table")
     
@@ -284,9 +303,30 @@ def create_missing_tables(cursor):
                 is_active BOOLEAN DEFAULT TRUE,
                 INDEX idx_user_id (user_id),
                 INDEX idx_session_token (session_token)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
         logger.info("✅ Created user_sessions table")
+    
+    # Warehouses table (if it doesn't exist)
+    if not table_exists(cursor, 'warehouses'):
+        logger.info("📝 Creating warehouses table...")
+        cursor.execute("""
+            CREATE TABLE warehouses (
+                id VARCHAR(10) PRIMARY KEY,
+                warehouse_code VARCHAR(10) NOT NULL UNIQUE,
+                warehouse_name VARCHAR(100) NOT NULL,
+                branch_id VARCHAR(10),
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_warehouse_code (warehouse_code),
+                INDEX idx_branch_id (branch_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        logger.info("✅ Created warehouses table")
+    
+    # Restore foreign key checks
+    restore_foreign_key_constraints(cursor)
 
 def create_indexes(cursor):
     """Create missing indexes for better performance"""
@@ -349,6 +389,9 @@ def main():
         connection = get_mysql_connection()
         cursor = connection.cursor()
         
+        # Disable foreign key checks at the beginning
+        fix_foreign_key_constraints(cursor)
+        
         # Create missing tables first
         create_missing_tables(cursor)
         connection.commit()
@@ -382,17 +425,26 @@ def main():
         create_indexes(cursor)
         connection.commit()
         
+        # Re-enable foreign key checks at the end
+        restore_foreign_key_constraints(cursor)
+        
         logger.info("=" * 60)
         logger.info("🎉 MySQL Migration Completed Successfully!")
         logger.info("✅ All missing columns have been added")
         logger.info("✅ All missing tables have been created") 
         logger.info("✅ All performance indexes have been created")
+        logger.info("✅ Foreign key constraints have been restored")
         logger.info("🔄 Please restart your WMS application")
         
     except Exception as e:
         logger.error(f"❌ Migration failed: {e}")
+        logger.info("💡 Tip: Check if warehouses table exists and has compatible column types")
         if connection:
-            connection.rollback()
+            try:
+                restore_foreign_key_constraints(cursor)
+                connection.rollback()
+            except:
+                pass
         sys.exit(1)
         
     finally:
