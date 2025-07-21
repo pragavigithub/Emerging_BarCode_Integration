@@ -545,7 +545,10 @@ function submitGRPO(grpoId) {
         }
         
         fetch('/grpo/' + grpoId + '/submit', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
         })
         .then(response => response.json())
         .then(data => {
@@ -578,14 +581,27 @@ function approveGRPO(grpoId) {
     
     if (confirm('Approve this GRPO and post to SAP B1?')) {
         approveBtn.disabled = true;
-        approveBtn.innerHTML = '<i data-feather="loader"></i> Approving...';
+        approveBtn.innerHTML = '<i data-feather="loader"></i> Posting to SAP B1...';
         
         fetch('/grpo/' + grpoId + '/approve', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                draft_or_post: 'post',
+                qc_notes: ''
+            })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
+                alert('Success: ' + data.message);
                 location.reload();
             } else {
                 alert('Error: ' + data.error);
@@ -594,8 +610,8 @@ function approveGRPO(grpoId) {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('Error approving GRPO');
+            console.error('Error approving GRPO:', error);
+            alert('Error approving GRPO: ' + error.message);
             approveBtn.disabled = false;
             approveBtn.innerHTML = '<i data-feather="check"></i> Approve & Post to SAP';
         });
@@ -605,19 +621,31 @@ function approveGRPO(grpoId) {
 function rejectGRPO(grpoId) {
     if (confirm('Reject this GRPO?')) {
         fetch('/grpo/' + grpoId + '/reject', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                qc_notes: ''
+            })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
+                alert('GRPO rejected successfully');
                 location.reload();
             } else {
                 alert('Error: ' + data.error);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('Error rejecting GRPO');
+            console.error('Error rejecting GRPO:', error);
+            alert('Error rejecting GRPO: ' + error.message);
         });
     }
 }

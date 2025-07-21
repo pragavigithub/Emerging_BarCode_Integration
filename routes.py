@@ -328,11 +328,23 @@ def add_grpo_item(grpo_id):
 def submit_grpo(grpo_id):
     grpo_doc = GRPODocument.query.get_or_404(grpo_id)
     
+    # Check if GRPO has items
+    if not grpo_doc.items:
+        message = 'Cannot submit GRPO without items'
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            return jsonify({'success': False, 'error': message}), 400
+        flash(message, 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
     # Update status to submitted for QC approval
     grpo_doc.status = 'submitted'
     db.session.commit()
     
-    flash('GRPO submitted for QC approval!', 'success')
+    message = 'GRPO submitted for QC approval!'
+    if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+        return jsonify({'success': True, 'message': message})
+    
+    flash(message, 'success')
     return redirect(url_for('grpo_detail', grpo_id=grpo_id))
 
 @app.route('/grpo/<int:grpo_id>/approve', methods=['POST'])
@@ -342,20 +354,37 @@ def approve_grpo(grpo_id):
     
     # Check if user has QC role
     if current_user.role not in ['qc', 'manager', 'admin']:
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            return jsonify({'success': False, 'error': 'You do not have permission to approve GRPO documents.'}), 403
         flash('You do not have permission to approve GRPO documents.', 'error')
         return redirect(url_for('grpo_detail', grpo_id=grpo_id))
     
-    # Get draft or post preference from form
-    grpo_doc.draft_or_post = request.form.get('draft_or_post', 'draft')
-    grpo_doc.qc_user_id = current_user.id
-    grpo_doc.qc_notes = request.form.get('qc_notes', '')
+    # Check if GRPO is in submitted status
+    if grpo_doc.status != 'submitted':
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            return jsonify({'success': False, 'error': 'Only submitted GRPOs can be approved.'}), 400
+        flash('Only submitted GRPOs can be approved.', 'error')
+        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
     
-    # Update all items QC status first
-    for item in grpo_doc.items:
-        item.qc_status = 'approved'
-    
-    # If user selected 'post', submit to SAP B1
-    if grpo_doc.draft_or_post == 'post':
+    try:
+        # Get draft or post preference from form or JSON
+        if request.is_json:
+            data = request.get_json() or {}
+            draft_or_post = data.get('draft_or_post', 'post')  # Default to post for AJAX calls
+            qc_notes = data.get('qc_notes', '')
+        else:
+            draft_or_post = request.form.get('draft_or_post', 'post')
+            qc_notes = request.form.get('qc_notes', '')
+        
+        grpo_doc.draft_or_post = draft_or_post
+        grpo_doc.qc_user_id = current_user.id
+        grpo_doc.qc_notes = qc_notes
+        
+        # Update all items QC status first
+        for item in grpo_doc.items:
+            item.qc_status = 'approved'
+        
+        # Always post to SAP B1 when using approve button
         logging.info("=" * 100)
         logging.info("🚀 POSTING GRPO TO SAP B1 - PURCHASE DELIVERY NOTE CREATION")
         logging.info("=" * 100)
@@ -370,23 +399,47 @@ def approve_grpo(grpo_id):
         if result.get('success'):
             grpo_doc.status = 'posted'
             grpo_doc.sap_document_number = result.get('sap_document_number')
+            db.session.commit()
+            
             logging.info("=" * 100)
             logging.info("✅ SUCCESS: GRPO POSTED TO SAP B1")
             logging.info(f"📄 SAP Document Number: {result.get('sap_document_number')}")
             logging.info("=" * 100)
-            flash(f'GRPO approved and posted to SAP B1 successfully! SAP Document Number: {result.get("sap_document_number")}', 'success')
+            
+            success_message = f'GRPO approved and posted to SAP B1 successfully! SAP Document Number: {result.get("sap_document_number")}'
+            
+            if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+                return jsonify({
+                    'success': True, 
+                    'message': success_message,
+                    'sap_document_number': result.get('sap_document_number')
+                })
+            flash(success_message, 'success')
         else:
             grpo_doc.status = 'approved'  # Keep as approved even if SAP posting fails
+            db.session.commit()
+            
             logging.error("=" * 100)
             logging.error("❌ FAILED: GRPO POSTING TO SAP B1 FAILED")
             logging.error(f"🚫 Error: {result.get('error')}")
             logging.error("=" * 100)
-            flash(f'GRPO approved but failed to post to SAP B1: {result.get("error")}', 'warning')
-    else:
-        grpo_doc.status = 'approved'
-        flash('GRPO approved successfully (saved as draft)', 'success')
+            
+            error_message = f'GRPO approved but failed to post to SAP B1: {result.get("error")}'
+            
+            if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+                return jsonify({
+                    'success': False,
+                    'error': error_message,
+                    'grpo_approved': True
+                })
+            flash(error_message, 'warning')
     
-    db.session.commit()
+    except Exception as e:
+        logging.error(f"Error approving GRPO: {str(e)}")
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            return jsonify({'success': False, 'error': f'Error approving GRPO: {str(e)}'}), 500
+        flash(f'Error approving GRPO: {str(e)}', 'error')
+    
     return redirect(url_for('grpo_detail', grpo_id=grpo_id))
 
 @app.route('/grpo/<int:grpo_id>/reject', methods=['POST'])
@@ -396,21 +449,35 @@ def reject_grpo(grpo_id):
     
     # Check if user has QC role
     if current_user.role not in ['qc', 'manager', 'admin']:
-        flash('You do not have permission to reject GRPO documents.', 'error')
+        message = 'You do not have permission to reject GRPO documents.'
+        if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+            return jsonify({'success': False, 'error': message}), 403
+        flash(message, 'error')
         return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    
+    # Get QC notes from form or JSON
+    if request.is_json:
+        data = request.get_json() or {}
+        qc_notes = data.get('qc_notes', '')
+    else:
+        qc_notes = request.form.get('qc_notes', '')
     
     grpo_doc.status = 'rejected'
     grpo_doc.qc_user_id = current_user.id
-    grpo_doc.qc_notes = request.form.get('qc_notes', '')
-    db.session.commit()
+    grpo_doc.qc_notes = qc_notes
     
     # Update all items QC status
     for item in grpo_doc.items:
         item.qc_status = 'rejected'
-        item.qc_notes = request.form.get('qc_notes', '')
+        item.qc_notes = qc_notes
+    
     db.session.commit()
     
-    flash('GRPO rejected!', 'warning')
+    message = 'GRPO rejected!'
+    if request.headers.get('Content-Type') == 'application/json' or request.is_json:
+        return jsonify({'success': True, 'message': message})
+    
+    flash(message, 'warning')
     return redirect(url_for('grpo_detail', grpo_id=grpo_id))
 
 @app.route('/grpo/<int:grpo_id>/item/<int:item_id>/edit', methods=['GET', 'POST'])
