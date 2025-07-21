@@ -100,7 +100,7 @@
                                     <td><strong>{{ item.item_code }}</strong></td>
                                     <td>{{ item.item_name }}</td>
                                     <td>{{ item.quantity }}</td>
-                                    <td>{{ item.unit_of_measure }}</td>
+                                    <td><strong>{{ item.unit_of_measure or 'EA' }}</strong></td>
                                     <td>
                                         {% set from_warehouse = item.from_bin.split('-')[0] if item.from_bin and '-' in item.from_bin else item.from_bin[:4] if item.from_bin else 'N/A' %}
                                         <strong>{{ from_warehouse }}</strong> / {{ item.from_bin or 'N/A' }}
@@ -325,10 +325,13 @@
                     </div>
                     <div class="mb-3">
                         <label for="batch_number" class="form-label">Batch Number</label>
-                        <select class="form-control" id="batch_number" name="batch_number">
-                            <option value="">Select Batch Number...</option>
-                        </select>
-                        <small class="text-muted">Batch numbers will be loaded when an item code is entered</small>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="batch_number" name="batch_number" placeholder="Enter batch number...">
+                            <button type="button" class="btn btn-outline-primary" onclick="scanBatchNumber()">
+                                <i data-feather="camera"></i> Scan
+                            </button>
+                        </div>
+                        <small class="text-muted">Enter batch number manually or scan barcode</small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -348,43 +351,14 @@ function showAddItemModal() {
     modal.show();
 }
 
-function loadBatchNumbers() {
-    const itemCode = document.getElementById('item_code').value.trim();
-    const batchSelect = document.getElementById('batch_number');
-    
-    if (!itemCode) {
-        batchSelect.innerHTML = '<option value="">Select Batch Number...</option>';
-        return;
+function scanBatchNumber() {
+    // Implement barcode scanning for batch number
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // Start barcode scanning
+        alert('Barcode scanning feature would be implemented here for batch numbers');
+    } else {
+        alert('Camera not available for scanning');
     }
-    
-    // Show loading state
-    batchSelect.innerHTML = '<option value="">Loading batch numbers...</option>';
-    
-    // Fetch batch numbers from API
-    fetch(`/api/batch-numbers/${encodeURIComponent(itemCode)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.batches) {
-                batchSelect.innerHTML = '<option value="">Select Batch Number...</option>';
-                
-                data.batches.forEach(batch => {
-                    const option = document.createElement('option');
-                    option.value = batch.Batch;
-                    option.textContent = `${batch.Batch}${batch.ExpirationDate ? ' (Exp: ' + new Date(batch.ExpirationDate).toLocaleDateString() + ')' : ''}`;
-                    batchSelect.appendChild(option);
-                });
-                
-                if (data.batches.length === 0) {
-                    batchSelect.innerHTML = '<option value="">No batch numbers found</option>';
-                }
-            } else {
-                batchSelect.innerHTML = '<option value="">Error loading batch numbers</option>';
-            }
-        })
-        .catch(error => {
-            console.error('Error loading batch numbers:', error);
-            batchSelect.innerHTML = '<option value="">Error loading batch numbers</option>';
-        });
 }
 
 function addItemFromRequest(itemCode, itemName, quantity, uom, fromWarehouse, toWarehouse) {
@@ -458,17 +432,9 @@ function editItem(itemId, itemCode, itemName, quantity, uom, fromBin, toBin, bat
     document.getElementById('from_bin').value = fromBin || '';
     document.getElementById('to_bin').value = toBin || '';
     
-    // Handle batch number dropdown
-    const batchSelect = document.getElementById('batch_number');
-    batchSelect.innerHTML = `<option value="${batchNumber || ''}" selected>${batchNumber || 'Select Batch Number...'}</option>`;
-    
-    // Load fresh batch numbers if item code is available
-    if (itemCode) {
-        loadBatchNumbers();
-        setTimeout(() => {
-            batchSelect.value = batchNumber || '';
-        }, 1000);
-    }
+    // Handle batch number textbox (changed from dropdown)
+    const batchInput = document.getElementById('batch_number');
+    batchInput.value = batchNumber || '';
     
     // Change form action to edit mode
     const form = document.getElementById('addItemForm');

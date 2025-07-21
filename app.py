@@ -35,30 +35,28 @@ app.secret_key = os.environ.get(
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure database with multiple database support
-# Priority: PostgreSQL (Replit) > MySQL > SQLite (fallback)
+# Priority: MySQL (user preference) > PostgreSQL (Replit) > SQLite (fallback)
 database_url = None
 db_type = "unknown"
 
-# Check for PostgreSQL configuration first (Replit environment)
-if os.environ.get("DATABASE_URL"):
+# Check for MySQL configuration first (user preference for local development)
+mysql_host = os.environ.get("MYSQL_HOST")
+mysql_user = os.environ.get("MYSQL_USER")
+mysql_password = os.environ.get("MYSQL_PASSWORD")
+mysql_database = os.environ.get("MYSQL_DATABASE")
+
+if mysql_host and mysql_user and mysql_password and mysql_database:
+    # MySQL configuration with proper URL encoding
+    from urllib.parse import quote_plus
+    encoded_password = quote_plus(mysql_password)
+    database_url = f"mysql+pymysql://{mysql_user}:{encoded_password}@{mysql_host}/{mysql_database}"
+    db_type = "mysql"
+    logging.info("✅ Using MySQL database (user preference)")
+elif os.environ.get("DATABASE_URL"):
     # PostgreSQL configuration (Replit environment)
     database_url = os.environ.get("DATABASE_URL")
     db_type = "postgresql"
     logging.info("✅ Using PostgreSQL database for Replit deployment")
-else:
-    # Check for MySQL configuration for local development
-    mysql_host = os.environ.get("MYSQL_HOST")
-    mysql_user = os.environ.get("MYSQL_USER")
-    mysql_password = os.environ.get("MYSQL_PASSWORD")
-    mysql_database = os.environ.get("MYSQL_DATABASE")
-
-    if mysql_host and mysql_user and mysql_password and mysql_database:
-        # MySQL configuration with proper URL encoding
-        from urllib.parse import quote_plus
-        encoded_password = quote_plus(mysql_password)
-        database_url = f"mysql+pymysql://{mysql_user}:{encoded_password}@{mysql_host}/{mysql_database}"
-        db_type = "mysql"
-        logging.info("✅ Using MySQL database")
 
 if database_url:
     # Production database configuration

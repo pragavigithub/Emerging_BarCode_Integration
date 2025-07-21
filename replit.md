@@ -117,6 +117,13 @@ Preferred communication style: Simple, everyday language.
 ## Changelog
 
 Latest Changes:
+- July 21, 2025. User Requirements Implementation:
+  - Database Priority Updated: Changed database connection priority to prioritize MySQL over PostgreSQL as per user preference for local development
+  - Inventory Transfer Batch Input: Modified batch number input from dropdown to textbox in inventory transfer screen (both add and edit modes)
+  - Screen-Level Authorization: Implemented permission checks for GRPO, Inventory Transfer, Pick List, and Inventory Counting screens
+  - UOM Display Enhancement: Added bold styling to Unit of Measure fields in both GRPO and Inventory Transfer screens for better visibility
+  - Added scanBatchNumber() function for barcode scanning capability in inventory transfer screens
+  - All screen access now properly validates user permissions using has_permission() method before allowing access
 - July 20, 2025. Migration from Replit Agent to Replit Environment Complete:
   - Successfully migrated Flask WMS application to Replit environment with PostgreSQL database
   - Fixed critical JavaScript template rendering issues in GRPO detail screen

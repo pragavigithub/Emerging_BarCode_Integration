@@ -189,7 +189,7 @@
                                         <strong>{{ item.received_quantity }}</strong>
                                         {% endif %}
                                     </td>
-                                    <td>{{ item.unit_of_measure or 'EA' }}</td>
+                                    <td><strong>{{ item.unit_of_measure or 'EA' }}</strong></td>
                                     <td>
                                         {% set warehouse_code = item.bin_location.split('-')[0] if item.bin_location and '-' in item.bin_location else item.bin_location[:4] if item.bin_location else 'N/A' %}
                                         <strong>{{ warehouse_code }}</strong>

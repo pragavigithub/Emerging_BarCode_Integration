@@ -99,6 +99,11 @@ def dashboard():
 @app.route('/grpo')
 @login_required
 def grpo():
+    # Screen-level authorization check
+    if not current_user.has_permission('grpo'):
+        flash('Access denied. You do not have permission to access GRPO screen.', 'error')
+        return redirect(url_for('dashboard'))
+    
     try:
         documents = GRPODocument.query.filter_by(user_id=current_user.id).order_by(GRPODocument.created_at.desc()).all()
     except Exception as e:
@@ -487,6 +492,11 @@ def update_grpo_item_field(item_id):
 @app.route('/inventory_transfer')
 @login_required
 def inventory_transfer():
+    # Screen-level authorization check
+    if not current_user.has_permission('inventory_transfer'):
+        flash('Access denied. You do not have permission to access Inventory Transfer screen.', 'error')
+        return redirect(url_for('dashboard'))
+    
     transfers = InventoryTransfer.query.filter_by(user_id=current_user.id).order_by(InventoryTransfer.created_at.desc()).all()
     return render_template('inventory_transfer.html', transfers=transfers)
 
@@ -838,6 +848,11 @@ def qc_dashboard():
 @app.route('/pick_list')
 @login_required
 def pick_list():
+    # Screen-level authorization check
+    if not current_user.has_permission('pick_list'):
+        flash('Access denied. You do not have permission to access Pick List screen.', 'error')
+        return redirect(url_for('dashboard'))
+    
     pick_lists = PickList.query.filter_by(user_id=current_user.id).order_by(PickList.created_at.desc()).all()
     return render_template('pick_list.html', pick_lists=pick_lists)
 
@@ -902,6 +917,11 @@ def reject_pick_list(pick_list_id):
 @app.route('/inventory_counting')
 @login_required
 def inventory_counting():
+    # Screen-level authorization check
+    if not current_user.has_permission('inventory_counting'):
+        flash('Access denied. You do not have permission to access Inventory Counting screen.', 'error')
+        return redirect(url_for('dashboard'))
+    
     counts = InventoryCount.query.filter_by(user_id=current_user.id).order_by(InventoryCount.created_at.desc()).all()
     return render_template('inventory_counting.html', counts=counts)
 
