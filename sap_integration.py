@@ -1241,7 +1241,7 @@ class SAPIntegration:
         logging.info("="*80)
         logging.info(json.dumps(pdn_data, indent=2, default=str))
         logging.info("="*80)
-        
+        print(pdn_data)
         try:
             response = self.session.post(url, json=pdn_data)
             if response.status_code == 201:
