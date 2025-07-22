@@ -113,6 +113,9 @@ This is a comprehensive Warehouse Management System (WMS) built with Flask that 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Database preference: MySQL database for local development with migration scripts.
+Mobile technology preference: React Native or Android Java for mobile applications.
+Module priorities: PickList Module, GRPO Module, Inventory Transfer Module.
 
 ## Changelog
 
