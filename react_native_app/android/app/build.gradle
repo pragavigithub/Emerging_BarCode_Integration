@@ -81,6 +81,12 @@ android {
     compileSdkVersion rootProject.ext.compileSdkVersion
 
     namespace "com.wmsmobileapp"
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
     defaultConfig {
         applicationId "com.wmsmobileapp"
         minSdkVersion rootProject.ext.minSdkVersion
