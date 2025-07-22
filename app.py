@@ -45,6 +45,7 @@ mysql_user = os.environ.get("MYSQL_USER")
 mysql_password = os.environ.get("MYSQL_PASSWORD")
 mysql_database = os.environ.get("MYSQL_DATABASE")
 
+encoded_password = None
 if all([mysql_host, mysql_user, mysql_password, mysql_database]):
     # MySQL configuration with proper URL encoding
     from urllib.parse import quote_plus
@@ -69,7 +70,7 @@ if database_url:
     }
     # Mask password in logs for security
     masked_url = database_url
-    if 'encoded_password' in locals():
+    if encoded_password:
         masked_url = database_url.replace(encoded_password, '***')
     logging.info(f"Database URL configured: {masked_url}")
 else:
@@ -172,12 +173,13 @@ with app.app_context():
         from models_extensions import Branch
         default_branch = Branch.query.filter_by(id='BR001').first()
         if not default_branch:
-            default_branch = Branch()
-            default_branch.id = 'BR001'
-            default_branch.name = 'Main Branch'
-            default_branch.address = 'Main Office'
-            default_branch.is_active = True
-            default_branch.is_default = True
+            default_branch = Branch(
+                id='BR001',
+                name='Main Branch',
+                address='Main Office',
+                is_active=True,
+                is_default=True
+            )
             db.session.add(default_branch)
             db.session.commit()
             logging.info("Default branch created")
@@ -192,15 +194,16 @@ with app.app_context():
         from models import User
         admin = User.query.filter_by(username='admin').first()
         if not admin:
-            admin = User()
-            admin.username = 'admin'
-            admin.email = 'admin@company.com'
-            admin.password_hash = generate_password_hash('admin123')
-            admin.first_name = 'System'
-            admin.last_name = 'Administrator'
-            admin.role = 'admin'
-            admin.branch_id = 'BR001'
-            admin.default_branch_id = 'BR001'
+            admin = User(
+                username='admin',
+                email='admin@company.com',
+                password_hash=generate_password_hash('admin123'),
+                first_name='System',
+                last_name='Administrator',
+                role='admin',
+                branch_id='BR001',
+                default_branch_id='BR001'
+            )
             db.session.add(admin)
             db.session.commit()
             logging.info("Default admin user created")
