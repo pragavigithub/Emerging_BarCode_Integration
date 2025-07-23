@@ -576,48 +576,8 @@ def create_inventory_transfer():
         flash('Please enter a transfer request number', 'error')
         return redirect(url_for('inventory_transfer'))
     
-    # Check if there are any remaining quantities to transfer
-    # Allow multiple transfers from same request number for partial transfers
-    existing_transfers = InventoryTransfer.query.filter_by(
-        transfer_request_number=transfer_request_number
-    ).all()
-    
-    # Check if all quantities have been transferred
-    if existing_transfers:
-        # Calculate transferred quantities to see if anything remains
-        sap = SAPIntegration()
-        transfer_data = sap.get_inventory_transfer_request(transfer_request_number)
-        
-        if transfer_data and 'StockTransferLines' in transfer_data:
-            all_lines = transfer_data['StockTransferLines']
-            
-            # Calculate transferred quantities
-            transferred_dict = {}
-            for existing_transfer in existing_transfers:
-                for item in existing_transfer.items:
-                    key = f"{item.item_code}_{item.batch_number or 'NOBATCH'}"
-                    transferred_dict[key] = transferred_dict.get(key, 0) + item.quantity
-            
-            # Check if any items have remaining quantities
-            has_remaining = False
-            for line in all_lines:
-                item_code = line.get('ItemCode', '')
-                batch_number = line.get('BatchNumber', '')
-                requested_qty = float(line.get('Quantity', 0))
-                
-                key = f"{item_code}_{batch_number or 'NOBATCH'}"
-                transferred_qty = transferred_dict.get(key, 0)
-                remaining_qty = requested_qty - transferred_qty
-                
-                if remaining_qty > 0:
-                    has_remaining = True
-                    break
-            
-            if not has_remaining:
-                flash(f'Transfer request {transfer_request_number} has been fully transferred. No remaining quantities to process.', 'info')
-                # Redirect to most recent transfer for this request
-                latest_transfer = max(existing_transfers, key=lambda t: t.created_at)
-                return redirect(url_for('inventory_transfer_detail', transfer_id=latest_transfer.id))
+    # Simple workflow: Each transfer request is treated as new
+    # No checking for existing transfers - user wants fresh start each time
     
     # Validate transfer request with SAP B1
     sap = SAPIntegration()
@@ -662,13 +622,12 @@ def create_inventory_transfer():
         user_id=current_user.id,
         from_warehouse=from_warehouse,
         to_warehouse=to_warehouse,
-        status='draft',
-        notes=f'Partial transfer #{transfer_suffix} from request {transfer_request_number}'
+        status='draft'
     )
     db.session.add(transfer)
     db.session.commit()
     
-    flash(f'Inventory transfer {transfer_request_number}-{transfer_suffix} created successfully! From: {from_warehouse} → To: {to_warehouse} (Remaining quantities available)', 'success')
+    flash(f'New inventory transfer created for request {transfer_request_number}! From: {from_warehouse} → To: {to_warehouse}', 'success')
     return redirect(url_for('inventory_transfer_detail', transfer_id=transfer.id))
 
 @app.route('/inventory_transfer/<int:transfer_id>', methods=['GET', 'POST'])
@@ -683,39 +642,17 @@ def inventory_transfer_detail(transfer_id):
     if transfer.transfer_request_number:
         transfer_data = sap.get_inventory_transfer_request(transfer.transfer_request_number)
         if transfer_data and 'StockTransferLines' in transfer_data:
-            # Get all lines and calculate remaining quantities
+            # Simple workflow: Show all available lines as fresh request
             all_lines = transfer_data['StockTransferLines']
             
-            # Get existing transfer items for this request
-            existing_transfers = db.session.query(InventoryTransferItem)\
-                .join(InventoryTransfer)\
-                .filter(InventoryTransfer.transfer_request_number == transfer.transfer_request_number)\
-                .all()
-            
-            # Create dict of transferred quantities by item code and batch
-            transferred_dict = {}
-            for item in existing_transfers:
-                key = f"{item.item_code}_{item.batch_number or 'NOBATCH'}"
-                transferred_dict[key] = transferred_dict.get(key, 0) + item.transferred_quantity
-            
-            # Filter lines with remaining quantity
-            available_items = []
+            # Show all lines as available (no previous transfer checking)
             for line in all_lines:
-                item_code = line.get('ItemCode', '')
-                batch_number = line.get('BatchNumber', '')
                 requested_qty = float(line.get('Quantity', 0))
-                
-                key = f"{item_code}_{batch_number or 'NOBATCH'}"
-                transferred_qty = transferred_dict.get(key, 0)
-                remaining_qty = requested_qty - transferred_qty
-                
-                # Only show lines with remaining quantity > 0
-                if remaining_qty > 0:
-                    line['RemainingQuantity'] = remaining_qty
-                    line['TransferredQuantity'] = transferred_qty
-                    available_items.append(line)
+                line['RemainingQuantity'] = requested_qty
+                line['TransferredQuantity'] = 0
+                available_items.append(line)
             
-            logging.info(f"Found {len(available_items)} items with remaining quantity out of {len(all_lines)} total for transfer request {transfer.transfer_request_number}")
+            logging.info(f"Found {len(available_items)} items available for fresh transfer request {transfer.transfer_request_number}")
     
     # Handle adding items to transfer
     if request.method == 'POST':
@@ -740,15 +677,12 @@ def inventory_transfer_detail(transfer_id):
                 actual_uom = unit_of_measure
                 logging.warning(f"⚠️ Could not get UOM from SAP for item {item_code}, using form value: {unit_of_measure}")
             
-            # Create new transfer item with partial transfer support
+            # Create new transfer item
             transfer_item = InventoryTransferItem(
                 inventory_transfer_id=transfer.id,
                 item_code=item_code,
                 item_name=item_name,
                 quantity=quantity,
-                requested_quantity=quantity,
-                transferred_quantity=0,
-                remaining_quantity=quantity,
                 unit_of_measure=actual_uom,
                 from_bin=from_bin,
                 to_bin=to_bin,

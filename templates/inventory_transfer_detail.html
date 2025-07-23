@@ -218,7 +218,7 @@
                             <i data-feather="arrow-left"></i> Back to Transfer List
                         </a>
                         <div>
-                            {% if transfer.status == 'draft' and (transfer.items or available_items) %}
+                            {% if transfer.status == 'draft' and transfer.items %}
                             <button class="btn btn-success" onclick="submitTransfer({{ transfer.id }})">
                                 <i data-feather="check"></i> Submit for QC Approval
                             </button>
