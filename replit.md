@@ -140,6 +140,18 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 23, 2025. Partial Transfer Support & Batch Dropdown Enhancement - COMPLETED:
+  - Implemented partial inventory transfer support allowing multiple stock transfers from same request number
+  - Replaced batch number text input with dropdown showing available batches with stock quantities and expiry dates
+  - Added reopen transfer functionality for rejected/completed transfers to process remaining quantities
+  - Enhanced Available Items display with transferred/remaining quantity tracking and color-coded badges
+  - Modified submit workflow to NOT post to SAP B1 automatically (supports multiple partial transfers)
+  - Added real-time batch quantity validation and automatic batch loading when item is selected
+  - Enhanced SAP integration with get_item_batches() and get_batch_stock() functions for real-time data
+  - Updated transfer creation logic to allow multiple transfers from same inventory request number
+  - Added transferred_quantity and remaining_quantity tracking in database models
+  - Submit button now shows when there are available items with remaining quantities
+  - Transfer workflow: Create multiple partial transfers → Submit for QC → Manual SAP B1 posting when complete
 - July 23, 2025. MySQL Migration Issue Resolution - COMPLETED:
   - Fixed "Unknown column 'inventory_transfer_items.qc_status'" error reported by user
   - Cleaned up all duplicate MySQL migration files (removed 10+ old migration scripts)

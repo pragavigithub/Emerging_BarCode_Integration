@@ -576,15 +576,48 @@ def create_inventory_transfer():
         flash('Please enter a transfer request number', 'error')
         return redirect(url_for('inventory_transfer'))
     
-    # Check if transfer already exists
-    existing_transfer = InventoryTransfer.query.filter_by(
-        transfer_request_number=transfer_request_number,
-        user_id=current_user.id
-    ).first()
+    # Check if there are any remaining quantities to transfer
+    # Allow multiple transfers from same request number for partial transfers
+    existing_transfers = InventoryTransfer.query.filter_by(
+        transfer_request_number=transfer_request_number
+    ).all()
     
-    if existing_transfer:
-        flash(f'Transfer request {transfer_request_number} already exists for your account', 'warning')
-        return redirect(url_for('inventory_transfer_detail', transfer_id=existing_transfer.id))
+    # Check if all quantities have been transferred
+    if existing_transfers:
+        # Calculate transferred quantities to see if anything remains
+        sap = SAPIntegration()
+        transfer_data = sap.get_inventory_transfer_request(transfer_request_number)
+        
+        if transfer_data and 'StockTransferLines' in transfer_data:
+            all_lines = transfer_data['StockTransferLines']
+            
+            # Calculate transferred quantities
+            transferred_dict = {}
+            for existing_transfer in existing_transfers:
+                for item in existing_transfer.items:
+                    key = f"{item.item_code}_{item.batch_number or 'NOBATCH'}"
+                    transferred_dict[key] = transferred_dict.get(key, 0) + item.quantity
+            
+            # Check if any items have remaining quantities
+            has_remaining = False
+            for line in all_lines:
+                item_code = line.get('ItemCode', '')
+                batch_number = line.get('BatchNumber', '')
+                requested_qty = float(line.get('Quantity', 0))
+                
+                key = f"{item_code}_{batch_number or 'NOBATCH'}"
+                transferred_qty = transferred_dict.get(key, 0)
+                remaining_qty = requested_qty - transferred_qty
+                
+                if remaining_qty > 0:
+                    has_remaining = True
+                    break
+            
+            if not has_remaining:
+                flash(f'Transfer request {transfer_request_number} has been fully transferred. No remaining quantities to process.', 'info')
+                # Redirect to most recent transfer for this request
+                latest_transfer = max(existing_transfers, key=lambda t: t.created_at)
+                return redirect(url_for('inventory_transfer_detail', transfer_id=latest_transfer.id))
     
     # Validate transfer request with SAP B1
     sap = SAPIntegration()
@@ -620,17 +653,22 @@ def create_inventory_transfer():
     logging.info(f"✅ Transfer request found: {transfer_data.get('DocNum')} - From: {from_warehouse} - To: {to_warehouse} - Open Lines: {len(open_lines)}")
     
     # Create inventory transfer with warehouse information
+    # Generate unique transfer number to distinguish multiple transfers from same request
+    import time
+    transfer_suffix = str(int(time.time()))[-6:]  # Last 6 digits of timestamp
+    
     transfer = InventoryTransfer(
         transfer_request_number=transfer_request_number,
         user_id=current_user.id,
         from_warehouse=from_warehouse,
         to_warehouse=to_warehouse,
-        status='draft'
+        status='draft',
+        notes=f'Partial transfer #{transfer_suffix} from request {transfer_request_number}'
     )
     db.session.add(transfer)
     db.session.commit()
     
-    flash(f'Inventory transfer {transfer_request_number} created successfully! From: {from_warehouse} → To: {to_warehouse} ({len(open_lines)} open lines)', 'success')
+    flash(f'Inventory transfer {transfer_request_number}-{transfer_suffix} created successfully! From: {from_warehouse} → To: {to_warehouse} (Remaining quantities available)', 'success')
     return redirect(url_for('inventory_transfer_detail', transfer_id=transfer.id))
 
 @app.route('/inventory_transfer/<int:transfer_id>', methods=['GET', 'POST'])
@@ -765,7 +803,7 @@ def validate_transfer_request_api(transfer_request_number):
 @app.route('/inventory_transfer/<int:transfer_id>/submit', methods=['POST'])
 @login_required
 def submit_transfer(transfer_id):
-    """Submit inventory transfer for QC approval"""
+    """Submit inventory transfer for QC approval (NO SAP B1 POSTING - Partial Transfer Support)"""
     try:
         transfer = InventoryTransfer.query.get_or_404(transfer_id)
         
@@ -781,16 +819,23 @@ def submit_transfer(transfer_id):
         if transfer.status != 'draft':
             return jsonify({'success': False, 'error': 'Transfer already submitted'}), 400
         
-        # Update transfer status to submitted for QC approval
+        # Update transfer status to submitted for QC approval ONLY
+        # DO NOT POST TO SAP B1 to allow multiple partial transfers from same request
         transfer.status = 'submitted'
         transfer.updated_at = datetime.utcnow()
+        
+        # Mark all items as submitted for QC
+        for item in transfer.items:
+            item.qc_status = 'submitted'
+        
         db.session.commit()
         
-        logging.info(f"✅ Inventory Transfer {transfer_id} submitted for QC approval")
+        logging.info(f"✅ Inventory Transfer {transfer_id} submitted for QC approval (NOT posted to SAP B1 - partial transfer support)")
         return jsonify({
             'success': True, 
-            'message': 'Transfer submitted for QC approval successfully',
-            'status': 'submitted'
+            'message': 'Transfer submitted for QC approval. Will not be posted to SAP B1 until all partial transfers are complete.',
+            'status': 'submitted',
+            'sap_document_number': 'Not Posted (Partial Transfer)'
         })
         
     except Exception as e:
