@@ -133,18 +133,42 @@ def approve(grpo_id):
         grpo.qc_approved_at = datetime.utcnow()
         grpo.qc_notes = qc_notes
         
-        # Here you would integrate with SAP B1 to create Purchase Delivery Note
-        # For now, we'll simulate success
-        grpo.sap_document_number = f"PDN-{grpo_id}-{datetime.now().strftime('%Y%m%d')}"
+        # Initialize SAP integration and post to SAP B1
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
         
-        db.session.commit()
+        # Log the posting attempt
+        logging.info(f"🚀 Attempting to post GRPO {grpo_id} to SAP B1...")
+        logging.info(f"GRPO Items: {len(grpo.items)} items, QC Approved: {len([i for i in grpo.items if i.qc_status == 'approved'])}")
         
-        logging.info(f"✅ GRPO {grpo_id} QC approved and posted to SAP B1")
-        return jsonify({
-            'success': True,
-            'message': f'GRPO approved and posted to SAP B1 as {grpo.sap_document_number}',
-            'sap_document_number': grpo.sap_document_number
-        })
+        # Post GRPO to SAP B1 as Purchase Delivery Note
+        sap_result = sap.post_grpo_to_sap(grpo)
+        
+        # Log the result
+        logging.info(f"📡 SAP B1 posting result: {sap_result}")
+        
+        if sap_result.get('success'):
+            grpo.sap_document_number = sap_result.get('sap_document_number')
+            grpo.status = 'posted'
+            db.session.commit()
+            
+            logging.info(f"✅ GRPO {grpo_id} QC approved and posted to SAP B1 as {grpo.sap_document_number}")
+            return jsonify({
+                'success': True,
+                'message': f'GRPO approved and posted to SAP B1 as {grpo.sap_document_number}',
+                'sap_document_number': grpo.sap_document_number
+            })
+        else:
+            # If SAP posting fails, still mark as QC approved but not posted
+            db.session.commit()
+            error_msg = sap_result.get('error', 'Unknown SAP error')
+            
+            logging.warning(f"⚠️ GRPO {grpo_id} QC approved but SAP posting failed: {error_msg}")
+            return jsonify({
+                'success': False,
+                'error': f'GRPO approved but SAP posting failed: {error_msg}',
+                'status': 'qc_approved'
+            })
         
     except Exception as e:
         logging.error(f"Error approving GRPO: {str(e)}")
