@@ -4,11 +4,30 @@
 
 You're getting this error because your MySQL database is missing required columns that were added in recent updates.
 
-## Solution: Run the Complete Migration Script
+## Solution: Easy One-Click Migration
 
-### Step 1: Set Environment Variables
+### Option 1: Windows Batch File (Recommended)
 
-First, set your MySQL connection details:
+Simply double-click or run:
+
+```batch
+run_mysql_migration.bat
+```
+
+This will:
+1. Prompt you for MySQL credentials
+2. Set environment variables automatically
+3. Run the migration script
+
+### Option 2: Python Setup Script
+
+```bash
+python setup_mysql_env.py
+```
+
+### Option 3: Manual Environment Variables
+
+If you prefer to set environment variables manually:
 
 ```bash
 # Windows Command Prompt
@@ -16,23 +35,13 @@ set MYSQL_HOST=localhost
 set MYSQL_USER=root
 set MYSQL_PASSWORD=your_password
 set MYSQL_DATABASE=your_database_name
+python complete_mysql_migration.py
 
 # Windows PowerShell
 $env:MYSQL_HOST="localhost"
-$env:MYSQL_USER="root"
+$env:MYSQL_USER="root"  
 $env:MYSQL_PASSWORD="your_password"
 $env:MYSQL_DATABASE="your_database_name"
-
-# Linux/Mac
-export MYSQL_HOST=localhost
-export MYSQL_USER=root
-export MYSQL_PASSWORD=your_password
-export MYSQL_DATABASE=your_database_name
-```
-
-### Step 2: Run the Migration Script
-
-```bash
 python complete_mysql_migration.py
 ```
 

@@ -140,6 +140,15 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 23, 2025. MySQL Migration Issue Resolution - COMPLETED:
+  - Fixed "Unknown column 'inventory_transfer_items.qc_status'" error reported by user
+  - Cleaned up all duplicate MySQL migration files (removed 10+ old migration scripts)
+  - Created single comprehensive migration script: complete_mysql_migration.py
+  - Added Windows-friendly setup scripts: setup_mysql_env.py and run_mysql_migration.bat
+  - Enhanced migration to add all missing columns: qc_status, qc_notes, serial_number, po_date, po_total, notes
+  - Migration script now handles complete database schema creation and missing column additions
+  - Created detailed MYSQL_MIGRATION_GUIDE.md with step-by-step instructions for Windows users
+  - Provided multiple migration options: batch file, Python setup script, and manual environment setup
 - July 23, 2025. Replit Migration Complete + MySQL Migration Fix - COMPLETED:
   - Successfully completed migration from Replit Agent to Replit environment
   - Set up PostgreSQL database for production deployment on Replit
