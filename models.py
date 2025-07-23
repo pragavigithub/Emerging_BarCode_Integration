@@ -1,7 +1,6 @@
 from datetime import datetime
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float, ForeignKey
 from sqlalchemy.orm import relationship
 from app import db
 
@@ -9,26 +8,26 @@ from app import db
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
-    id = Column(Integer, primary_key=True)
-    username = Column(String(80), unique=True, nullable=False)
-    email = Column(String(120), unique=True, nullable=False)
-    password_hash = Column(String(256), nullable=False)
-    first_name = Column(String(80), nullable=False)
-    last_name = Column(String(80), nullable=False)
-    role = Column(String(20), nullable=False,
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    first_name = db.Column(db.String(80), nullable=False)
+    last_name = db.Column(db.String(80), nullable=False)
+    role = db.Column(db.String(20), nullable=False,
                   default='user')  # admin, manager, user, qc
-    branch_id = Column(String(10), nullable=True)
-    branch_name = Column(String(100), nullable=True)
-    default_branch_id = Column(
-        String(10), nullable=True)  # Default branch if none selected
-    is_active = Column(Boolean, default=True)
-    must_change_password = Column(
-        Boolean, default=False)  # Force password change on next login
-    last_login = Column(DateTime, nullable=True)
-    permissions = Column(Text,
+    branch_id = db.Column(db.String(10), nullable=True)
+    branch_name = db.Column(db.String(100), nullable=True)
+    default_branch_id = db.Column(
+        db.String(10), nullable=True)  # Default branch if none selected
+    is_active = db.Column(db.Boolean, default=True)
+    must_change_password = db.Column(
+        db.Boolean, default=False)  # Force password change on next login
+    last_login = db.Column(db.DateTime, nullable=True)
+    permissions = db.Column(db.Text,
                          nullable=True)  # JSON string of screen permissions
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime,
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime,
                         default=datetime.utcnow,
                         onupdate=datetime.utcnow)
 
@@ -115,24 +114,24 @@ class User(UserMixin, db.Model):
 class GRPODocument(db.Model):
     __tablename__ = 'grpo_documents'
 
-    id = Column(Integer, primary_key=True)
-    po_number = Column(String(20), nullable=False)
-    sap_document_number = Column(String(20), nullable=True)
-    supplier_code = Column(String(50), nullable=True)  # CardCode from SAP
-    supplier_name = Column(String(200), nullable=True)
-    po_date = Column(DateTime, nullable=True)
-    po_total = Column(Float, nullable=True)
-    status = Column(
-        String(20),
+    id = db.Column(db.Integer, primary_key=True)
+    po_number = db.Column(db.String(20), nullable=False)
+    sap_document_number = db.Column(db.String(20), nullable=True)
+    supplier_code = db.Column(db.String(50), nullable=True)  # CardCode from SAP
+    supplier_name = db.Column(db.String(200), nullable=True)
+    po_date = db.Column(db.DateTime, nullable=True)
+    po_total = db.Column(db.Float, nullable=True)
+    status = db.Column(
+        db.String(20),
         default='draft')  # draft, submitted, approved, posted, rejected
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    qc_user_id = Column(Integer, ForeignKey('users.id'),
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    qc_user_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                         nullable=True)  # QC approver
-    qc_notes = Column(Text, nullable=True)
-    notes = Column(Text, nullable=True)  # General notes/comments for the GRPO
-    draft_or_post = Column(String(10), default='draft')  # draft, post
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime,
+    qc_notes = db.Column(db.Text, nullable=True)
+    notes = db.Column(db.Text, nullable=True)  # General notes/comments for the GRPO
+    draft_or_post = db.Column(db.String(10), default='draft')  # draft, post
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime,
                         default=datetime.utcnow,
                         onupdate=datetime.utcnow)
 
@@ -147,32 +146,32 @@ class GRPODocument(db.Model):
 class GRPOItem(db.Model):
     __tablename__ = 'grpo_items'
 
-    id = Column(Integer, primary_key=True)
-    grpo_document_id = Column(Integer,
-                              ForeignKey('grpo_documents.id'),
+    id = db.Column(db.Integer, primary_key=True)
+    grpo_document_id = db.Column(db.Integer,
+                              db.ForeignKey('grpo_documents.id'),
                               nullable=False)
-    po_line_number = Column(Integer, nullable=True)  # Line number from PO
-    item_code = Column(String(50), nullable=False)
-    item_name = Column(String(200), nullable=False)
-    po_quantity = Column(Float, nullable=True)  # Original PO quantity
-    open_quantity = Column(Float, nullable=True)  # Remaining open quantity
-    received_quantity = Column(Float,
+    po_line_number = db.Column(db.Integer, nullable=True)  # Line number from PO
+    item_code = db.Column(db.String(50), nullable=False)
+    item_name = db.Column(db.String(200), nullable=False)
+    po_quantity = db.Column(db.Float, nullable=True)  # Original PO quantity
+    open_quantity = db.Column(db.Float, nullable=True)  # Remaining open quantity
+    received_quantity = db.Column(db.Float,
                                nullable=False)  # Quantity being received
-    unit_of_measure = Column(String(10), nullable=False)
-    unit_price = Column(Float, nullable=True)
-    bin_location = Column(String(20), nullable=False)
-    batch_number = Column(String(50), nullable=True)
-    serial_number = Column(String(50), nullable=True)  # Serial number for serial-managed items
-    expiration_date = Column(DateTime, nullable=True)
-    supplier_barcode = Column(String(100),
+    unit_of_measure = db.Column(db.String(10), nullable=False)
+    unit_price = db.Column(db.Float, nullable=True)
+    bin_location = db.Column(db.String(20), nullable=False)
+    batch_number = db.Column(db.String(50), nullable=True)
+    serial_number = db.Column(db.String(50), nullable=True)  # Serial number for serial-managed items
+    expiration_date = db.Column(db.DateTime, nullable=True)
+    supplier_barcode = db.Column(db.String(100),
                               nullable=True)  # Original supplier barcode
-    generated_barcode = Column(String(100),
+    generated_barcode = db.Column(db.String(100),
                                nullable=True)  # WMS generated barcode
-    barcode_printed = Column(Boolean, default=False)
-    qc_status = Column(String(20),
+    barcode_printed = db.Column(db.Boolean, default=False)
+    qc_status = db.Column(db.String(20),
                        default='pending')  # pending, approved, rejected
-    qc_notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    qc_notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     grpo_document = relationship('GRPODocument', back_populates='items')
@@ -181,19 +180,19 @@ class GRPOItem(db.Model):
 class InventoryTransfer(db.Model):
     __tablename__ = 'inventory_transfers'
 
-    id = Column(Integer, primary_key=True)
-    transfer_request_number = Column(String(20), nullable=False)
-    sap_document_number = Column(String(20), nullable=True)
-    status = Column(String(20),
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_request_number = db.Column(db.String(20), nullable=False)
+    sap_document_number = db.Column(db.String(20), nullable=True)
+    status = db.Column(db.String(20),
                     default='draft')  # draft, submitted, qc_approved, posted, rejected
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    qc_approver_id = Column(Integer, ForeignKey('users.id'), nullable=True)
-    qc_approved_at = Column(DateTime, nullable=True)
-    qc_notes = Column(Text, nullable=True)
-    from_warehouse = Column(String(20), nullable=True)
-    to_warehouse = Column(String(20), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime,
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    qc_approver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    qc_approved_at = db.Column(db.DateTime, nullable=True)
+    qc_notes = db.Column(db.Text, nullable=True)
+    from_warehouse = db.Column(db.String(20), nullable=True)
+    to_warehouse = db.Column(db.String(20), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime,
                         default=datetime.utcnow,
                         onupdate=datetime.utcnow)
 
@@ -207,20 +206,20 @@ class InventoryTransfer(db.Model):
 class InventoryTransferItem(db.Model):
     __tablename__ = 'inventory_transfer_items'
 
-    id = Column(Integer, primary_key=True)
-    inventory_transfer_id = Column(Integer,
-                                   ForeignKey('inventory_transfers.id'),
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_transfer_id = db.Column(db.Integer,
+                                   db.ForeignKey('inventory_transfers.id'),
                                    nullable=False)
-    item_code = Column(String(50), nullable=False)
-    item_name = Column(String(200), nullable=False)
-    quantity = Column(Float, nullable=False)
-    unit_of_measure = Column(String(10), nullable=False)
-    from_bin = Column(String(20), nullable=False)
-    to_bin = Column(String(20), nullable=False)
-    batch_number = Column(String(50), nullable=True)
-    qc_status = Column(String(20), default='pending')  # pending, approved, rejected
-    qc_notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    item_code = db.Column(db.String(50), nullable=False)
+    item_name = db.Column(db.String(200), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    unit_of_measure = db.Column(db.String(10), nullable=False)
+    from_bin = db.Column(db.String(20), nullable=False)
+    to_bin = db.Column(db.String(20), nullable=False)
+    batch_number = db.Column(db.String(50), nullable=True)
+    qc_status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    qc_notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     inventory_transfer = relationship('InventoryTransfer',
@@ -230,16 +229,16 @@ class InventoryTransferItem(db.Model):
 class PickList(db.Model):
     __tablename__ = 'pick_lists'
 
-    id = Column(Integer, primary_key=True)
-    sales_order_number = Column(String(20), nullable=False)
-    pick_list_number = Column(String(20), nullable=False)
-    status = Column(
-        String(20),
+    id = db.Column(db.Integer, primary_key=True)
+    sales_order_number = db.Column(db.String(20), nullable=False)
+    pick_list_number = db.Column(db.String(20), nullable=False)
+    status = db.Column(
+        db.String(20),
         default='pending')  # pending, approved, rejected, completed
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    approver_id = Column(Integer, ForeignKey('users.id'), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime,
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    approver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime,
                         default=datetime.utcnow,
                         onupdate=datetime.utcnow)
 
@@ -254,16 +253,16 @@ class PickList(db.Model):
 class PickListItem(db.Model):
     __tablename__ = 'pick_list_items'
 
-    id = Column(Integer, primary_key=True)
-    pick_list_id = Column(Integer, ForeignKey('pick_lists.id'), nullable=False)
-    item_code = Column(String(50), nullable=False)
-    item_name = Column(String(200), nullable=False)
-    quantity = Column(Float, nullable=False)
-    picked_quantity = Column(Float, default=0)
-    unit_of_measure = Column(String(10), nullable=False)
-    bin_location = Column(String(20), nullable=False)
-    batch_number = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id = db.Column(db.Integer, primary_key=True)
+    pick_list_id = db.Column(db.Integer, db.ForeignKey('pick_lists.id'), nullable=False)
+    item_code = db.Column(db.String(50), nullable=False)
+    item_name = db.Column(db.String(200), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    picked_quantity = db.Column(db.Float, default=0)
+    unit_of_measure = db.Column(db.String(10), nullable=False)
+    bin_location = db.Column(db.String(20), nullable=False)
+    batch_number = db.Column(db.String(50), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     pick_list = relationship('PickList', back_populates='items')
@@ -272,15 +271,15 @@ class PickListItem(db.Model):
 class InventoryCount(db.Model):
     __tablename__ = 'inventory_counts'
 
-    id = Column(Integer, primary_key=True)
-    count_number = Column(String(20), nullable=False)
-    warehouse_code = Column(String(10), nullable=False)
-    bin_location = Column(String(20), nullable=False)
-    status = Column(String(20),
+    id = db.Column(db.Integer, primary_key=True)
+    count_number = db.Column(db.String(20), nullable=False)
+    warehouse_code = db.Column(db.String(10), nullable=False)
+    bin_location = db.Column(db.String(20), nullable=False)
+    status = db.Column(db.String(20),
                     default='assigned')  # assigned, in_progress, completed
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime,
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime,
                         default=datetime.utcnow,
                         onupdate=datetime.utcnow)
 
@@ -293,18 +292,18 @@ class InventoryCount(db.Model):
 class InventoryCountItem(db.Model):
     __tablename__ = 'inventory_count_items'
 
-    id = Column(Integer, primary_key=True)
-    inventory_count_id = Column(Integer,
-                                ForeignKey('inventory_counts.id'),
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_count_id = db.Column(db.Integer,
+                                db.ForeignKey('inventory_counts.id'),
                                 nullable=False)
-    item_code = Column(String(50), nullable=False)
-    item_name = Column(String(200), nullable=False)
-    system_quantity = Column(Float, nullable=False)
-    counted_quantity = Column(Float, nullable=False)
-    variance = Column(Float, nullable=False)
-    unit_of_measure = Column(String(10), nullable=False)
-    batch_number = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    item_code = db.Column(db.String(50), nullable=False)
+    item_name = db.Column(db.String(200), nullable=False)
+    system_quantity = db.Column(db.Float, nullable=False)
+    counted_quantity = db.Column(db.Float, nullable=False)
+    variance = db.Column(db.Float, nullable=False)
+    unit_of_measure = db.Column(db.String(10), nullable=False)
+    batch_number = db.Column(db.String(50), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
     inventory_count = relationship('InventoryCount', back_populates='items')
@@ -313,10 +312,10 @@ class InventoryCountItem(db.Model):
 class BarcodeLabel(db.Model):
     __tablename__ = 'barcode_labels'
 
-    id = Column(Integer, primary_key=True)
-    item_code = Column(String(50), nullable=False)
-    barcode = Column(String(100), nullable=False)
-    label_format = Column(String(20), nullable=False)
-    print_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_printed = Column(DateTime, nullable=True)
+    id = db.Column(db.Integer, primary_key=True)
+    item_code = db.Column(db.String(50), nullable=False)
+    barcode = db.Column(db.String(100), nullable=False)
+    label_format = db.Column(db.String(20), nullable=False)
+    print_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_printed = db.Column(db.DateTime, nullable=True)
