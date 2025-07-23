@@ -32,8 +32,8 @@ def get_mysql_connection():
         config = {
             'host': os.environ.get('MYSQL_HOST', 'localhost'),
             'user': os.environ.get('MYSQL_USER', 'root'),
-            'password': os.environ.get('MYSQL_PASSWORD', ''),
-            'database': os.environ.get('MYSQL_DATABASE', 'wms_database'),
+            'password': os.environ.get('MYSQL_PASSWORD', 'root@123'),
+            'database': os.environ.get('MYSQL_DATABASE', 'wms_db_dev'),
             'charset': 'utf8mb4',
             'collation': 'utf8mb4_unicode_ci',
             'autocommit': True
