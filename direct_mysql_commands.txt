@@ -1,41 +1,28 @@
-DIRECT MySQL Commands to Fix the Issue
-=====================================
+-- URGENT MySQL Database Fix Commands
+-- Copy and paste these into your MySQL client
 
-Copy and paste these commands directly into your MySQL client:
+-- Connect to your database (replace 'wms_database' with your actual database name)
+USE wms_database;
 
--- Connect to your database first
-USE wms_db;
+-- Add missing qc_status column to inventory_transfer_items table
+ALTER TABLE inventory_transfer_items 
+ADD COLUMN qc_status VARCHAR(20) DEFAULT 'pending';
 
--- Add the missing notes column (this is the immediate fix needed)
-ALTER TABLE grpo_documents ADD COLUMN notes TEXT;
+-- Add missing QC approval columns to inventory_transfers table
+ALTER TABLE inventory_transfers 
+ADD COLUMN qc_approver_id INT,
+ADD COLUMN qc_approved_at DATETIME,
+ADD COLUMN qc_notes TEXT;
 
--- Add other missing columns for full functionality
-ALTER TABLE grpo_documents ADD COLUMN qc_notes TEXT;
-ALTER TABLE grpo_documents ADD COLUMN draft_or_post VARCHAR(10) DEFAULT 'draft';
-
--- Add missing columns to grpo_items table
-ALTER TABLE grpo_items ADD COLUMN generated_barcode VARCHAR(100);
-ALTER TABLE grpo_items ADD COLUMN barcode_printed BOOLEAN DEFAULT FALSE;
-ALTER TABLE grpo_items ADD COLUMN qc_status VARCHAR(20) DEFAULT 'pending';
-ALTER TABLE grpo_items ADD COLUMN qc_notes TEXT;
+-- Add foreign key constraint (optional, may fail if users table doesn't exist)
+ALTER TABLE inventory_transfers 
+ADD CONSTRAINT fk_inventory_transfers_qc_approver 
+FOREIGN KEY (qc_approver_id) REFERENCES users(id);
 
 -- Verify the changes
-DESCRIBE grpo_documents;
-DESCRIBE grpo_items;
+DESCRIBE inventory_transfer_items;
+DESCRIBE inventory_transfers;
 
--- If any command gives "Duplicate column name" error, that's OK - it means the column already exists
-
-IMPORTANT NOTES:
-===============
-1. Run these commands in MySQL Workbench or MySQL command line
-2. Make sure you're connected to the correct database (wms_db)
-3. If you get "Duplicate column name" errors, that's normal - skip those commands
-4. The most important command is the first one: ALTER TABLE grpo_documents ADD COLUMN notes TEXT;
-
-ALTERNATIVE - Quick Single Command:
-==================================
-If you just want to fix the immediate error, run only this:
-
-ALTER TABLE grpo_documents ADD COLUMN notes TEXT;
-
-This single command will resolve the "Unknown column 'grpo_documents.notes'" error.
+-- You should see the new columns listed
+-- qc_status in inventory_transfer_items
+-- qc_approver_id, qc_approved_at, qc_notes in inventory_transfers
