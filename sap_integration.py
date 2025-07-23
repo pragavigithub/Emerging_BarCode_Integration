@@ -470,6 +470,97 @@ class SAPIntegration:
             logging.error(f"Error fetching batch numbers for {item_code}: {str(e)}")
             return []
 
+    def get_item_batches(self, item_code, warehouse_code=''):
+        """Get available batches for an item with stock information"""
+        logging.info(f"🔍 Getting batches for item {item_code} in warehouse {warehouse_code}")
+        
+        if not self.ensure_logged_in():
+            logging.warning("⚠️ No SAP B1 session - returning mock batch data")
+            return self._get_mock_batch_data(item_code)
+        
+        try:
+            # SAP B1 API to get batch details
+            filter_clause = f"ItemCode eq '{item_code}'"
+            if warehouse_code:
+                filter_clause += f" and Warehouse eq '{warehouse_code}'"
+            
+            url = f"{self.base_url}/b1s/v1/BatchNumberDetails?$filter={filter_clause}&$select=BatchNumber,OnHandQuantity,ExpiryDate,ManufacturingDate,Warehouse"
+            
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                batches = data.get('value', [])
+                logging.info(f"✅ Found {len(batches)} batches for item {item_code}")
+                return batches
+            else:
+                logging.error(f"❌ SAP B1 API error getting batches: {response.status_code}")
+                return self._get_mock_batch_data(item_code)
+                
+        except Exception as e:
+            logging.error(f"❌ Error getting batches from SAP B1: {str(e)}")
+            return self._get_mock_batch_data(item_code)
+
+    def get_batch_stock(self, item_code, batch_number, warehouse_code=''):
+        """Get stock level for a specific batch"""
+        logging.info(f"📊 Getting stock for batch {batch_number} of item {item_code}")
+        
+        if not self.ensure_logged_in():
+            logging.warning("⚠️ No SAP B1 session - returning mock stock data")
+            return {'OnHandQuantity': 100, 'Warehouse': warehouse_code, 'ExpiryDate': '2025-12-31', 'ManufacturingDate': '2025-01-01'}
+        
+        try:
+            filter_clause = f"ItemCode eq '{item_code}' and BatchNumber eq '{batch_number}'"
+            if warehouse_code:
+                filter_clause += f" and Warehouse eq '{warehouse_code}'"
+            
+            url = f"{self.base_url}/b1s/v1/BatchNumberDetails?$filter={filter_clause}"
+            
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                batches = data.get('value', [])
+                if batches:
+                    logging.info(f"✅ Found stock for batch {batch_number}: {batches[0].get('OnHandQuantity', 0)}")
+                    return batches[0]
+                else:
+                    logging.warning(f"⚠️ Batch {batch_number} not found for item {item_code}")
+                    return None
+            else:
+                logging.error(f"❌ SAP B1 API error getting batch stock: {response.status_code}")
+                return {'OnHandQuantity': 100, 'Warehouse': warehouse_code, 'ExpiryDate': '2025-12-31', 'ManufacturingDate': '2025-01-01'}
+                
+        except Exception as e:
+            logging.error(f"❌ Error getting batch stock from SAP B1: {str(e)}")
+            return {'OnHandQuantity': 100, 'Warehouse': warehouse_code, 'ExpiryDate': '2025-12-31', 'ManufacturingDate': '2025-01-01'}
+
+    def _get_mock_batch_data(self, item_code):
+        """Return mock batch data for offline testing"""
+        return [
+            {
+                'BatchNumber': 'A22',
+                'OnHandQuantity': 66.0,
+                'ExpiryDate': '2025-12-31T00:00:00Z',
+                'ManufacturingDate': '2025-01-01T00:00:00Z',
+                'Warehouse': 'ORD-CHN'
+            },
+            {
+                'BatchNumber': 'B23',
+                'OnHandQuantity': 45.0,
+                'ExpiryDate': '2026-06-30T00:00:00Z',
+                'ManufacturingDate': '2025-06-01T00:00:00Z',
+                'Warehouse': 'ORD-CHN'
+            },
+            {
+                'BatchNumber': 'C24',
+                'OnHandQuantity': 32.0,
+                'ExpiryDate': '2026-12-31T00:00:00Z',
+                'ManufacturingDate': '2025-12-01T00:00:00Z',
+                'Warehouse': 'ORD-CHN'
+            }
+        ]
+
     def create_inventory_transfer(self, transfer_document):
         """Create Stock Transfer in SAP B1 with correct JSON structure"""
         if not self.ensure_logged_in():

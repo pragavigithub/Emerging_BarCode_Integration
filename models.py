@@ -213,10 +213,14 @@ class InventoryTransferItem(db.Model):
     item_code = db.Column(db.String(50), nullable=False)
     item_name = db.Column(db.String(200), nullable=False)
     quantity = db.Column(db.Float, nullable=False)
+    requested_quantity = db.Column(db.Float, nullable=False)  # Original requested quantity
+    transferred_quantity = db.Column(db.Float, default=0)  # Actually transferred quantity
+    remaining_quantity = db.Column(db.Float, nullable=False)  # Remaining to transfer
     unit_of_measure = db.Column(db.String(10), nullable=False)
     from_bin = db.Column(db.String(20), nullable=False)
     to_bin = db.Column(db.String(20), nullable=False)
     batch_number = db.Column(db.String(50), nullable=True)
+    available_batches = db.Column(db.Text, nullable=True)  # JSON list of available batches
     qc_status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
     qc_notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

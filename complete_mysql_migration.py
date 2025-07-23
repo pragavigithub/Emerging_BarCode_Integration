@@ -200,11 +200,15 @@ def create_complete_schema(cursor):
             item_code VARCHAR(50) NOT NULL,
             item_name VARCHAR(200) NOT NULL,
             quantity DECIMAL(15,3) NOT NULL,
+            requested_quantity DECIMAL(15,3) NOT NULL,
+            transferred_quantity DECIMAL(15,3) DEFAULT 0,
+            remaining_quantity DECIMAL(15,3) NOT NULL,
             unit_of_measure VARCHAR(10) NOT NULL,
             from_bin_location VARCHAR(20) NOT NULL,
             to_bin_location VARCHAR(20) NOT NULL,
             batch_number VARCHAR(50),
             serial_number VARCHAR(50),
+            available_batches TEXT,
             qc_status VARCHAR(20) DEFAULT 'pending',
             qc_notes TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -312,6 +316,23 @@ def add_missing_columns(cursor):
     if not check_column_exists(cursor, 'inventory_transfer_items', 'serial_number'):
         cursor.execute("ALTER TABLE inventory_transfer_items ADD COLUMN serial_number VARCHAR(50)")
         logger.info("✅ Added serial_number column to inventory_transfer_items")
+    
+    # Add new columns for partial transfer support
+    if not check_column_exists(cursor, 'inventory_transfer_items', 'requested_quantity'):
+        cursor.execute("ALTER TABLE inventory_transfer_items ADD COLUMN requested_quantity DECIMAL(15,3) NOT NULL DEFAULT 0")
+        logger.info("✅ Added requested_quantity column to inventory_transfer_items")
+    
+    if not check_column_exists(cursor, 'inventory_transfer_items', 'transferred_quantity'):
+        cursor.execute("ALTER TABLE inventory_transfer_items ADD COLUMN transferred_quantity DECIMAL(15,3) DEFAULT 0")
+        logger.info("✅ Added transferred_quantity column to inventory_transfer_items")
+    
+    if not check_column_exists(cursor, 'inventory_transfer_items', 'remaining_quantity'):
+        cursor.execute("ALTER TABLE inventory_transfer_items ADD COLUMN remaining_quantity DECIMAL(15,3) NOT NULL DEFAULT 0")
+        logger.info("✅ Added remaining_quantity column to inventory_transfer_items")
+    
+    if not check_column_exists(cursor, 'inventory_transfer_items', 'available_batches'):
+        cursor.execute("ALTER TABLE inventory_transfer_items ADD COLUMN available_batches TEXT")
+        logger.info("✅ Added available_batches column to inventory_transfer_items")
     
     # Check and add missing columns to grpo_documents
     if not check_column_exists(cursor, 'grpo_documents', 'po_date'):

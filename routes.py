@@ -645,10 +645,39 @@ def inventory_transfer_detail(transfer_id):
     if transfer.transfer_request_number:
         transfer_data = sap.get_inventory_transfer_request(transfer.transfer_request_number)
         if transfer_data and 'StockTransferLines' in transfer_data:
-            # Filter only open line items
+            # Get all lines and calculate remaining quantities
             all_lines = transfer_data['StockTransferLines']
-            available_items = [line for line in all_lines if line.get('LineStatus', '').lower() in ['open', 'bost_open', 'o'] or not line.get('LineStatus')]
-            logging.info(f"Found {len(available_items)} open items out of {len(all_lines)} total for transfer request {transfer.transfer_request_number}")
+            
+            # Get existing transfer items for this request
+            existing_transfers = db.session.query(InventoryTransferItem)\
+                .join(InventoryTransfer)\
+                .filter(InventoryTransfer.transfer_request_number == transfer.transfer_request_number)\
+                .all()
+            
+            # Create dict of transferred quantities by item code and batch
+            transferred_dict = {}
+            for item in existing_transfers:
+                key = f"{item.item_code}_{item.batch_number or 'NOBATCH'}"
+                transferred_dict[key] = transferred_dict.get(key, 0) + item.transferred_quantity
+            
+            # Filter lines with remaining quantity
+            available_items = []
+            for line in all_lines:
+                item_code = line.get('ItemCode', '')
+                batch_number = line.get('BatchNumber', '')
+                requested_qty = float(line.get('Quantity', 0))
+                
+                key = f"{item_code}_{batch_number or 'NOBATCH'}"
+                transferred_qty = transferred_dict.get(key, 0)
+                remaining_qty = requested_qty - transferred_qty
+                
+                # Only show lines with remaining quantity > 0
+                if remaining_qty > 0:
+                    line['RemainingQuantity'] = remaining_qty
+                    line['TransferredQuantity'] = transferred_qty
+                    available_items.append(line)
+            
+            logging.info(f"Found {len(available_items)} items with remaining quantity out of {len(all_lines)} total for transfer request {transfer.transfer_request_number}")
     
     # Handle adding items to transfer
     if request.method == 'POST':
@@ -673,12 +702,15 @@ def inventory_transfer_detail(transfer_id):
                 actual_uom = unit_of_measure
                 logging.warning(f"⚠️ Could not get UOM from SAP for item {item_code}, using form value: {unit_of_measure}")
             
-            # Create new transfer item
+            # Create new transfer item with partial transfer support
             transfer_item = InventoryTransferItem(
                 inventory_transfer_id=transfer.id,
                 item_code=item_code,
                 item_name=item_name,
                 quantity=quantity,
+                requested_quantity=quantity,
+                transferred_quantity=0,
+                remaining_quantity=quantity,
                 unit_of_measure=actual_uom,
                 from_bin=from_bin,
                 to_bin=to_bin,
@@ -886,6 +918,48 @@ def reopen_transfer(transfer_id):
         return jsonify({
             'success': True, 
             'message': 'Transfer reopened successfully. You can now edit and resubmit it.',
+            'status': 'draft'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error reopening transfer: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/inventory_transfer/<int:transfer_id>/reopen', methods=['POST'])
+@login_required
+def reopen_transfer_additional(transfer_id):
+    """Reopen a rejected or completed transfer for additional quantities"""
+    try:
+        transfer = InventoryTransfer.query.get_or_404(transfer_id)
+        
+        # Check if user owns this transfer or has admin/manager permissions
+        if transfer.user_id != current_user.id and not current_user.has_permission('admin') and not current_user.has_permission('manager'):
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        # Check if transfer can be reopened
+        if transfer.status not in ['rejected', 'posted']:
+            return jsonify({'success': False, 'error': 'Only rejected or completed transfers can be reopened'}), 400
+        
+        # Reset transfer to draft status
+        transfer.status = 'draft'
+        transfer.qc_approver_id = None
+        transfer.qc_approved_at = None
+        if transfer.status == 'rejected':
+            transfer.qc_notes = None
+        transfer.updated_at = datetime.utcnow()
+        
+        # Reset all item QC statuses
+        for item in transfer.items:
+            item.qc_status = 'pending'
+            if transfer.status == 'rejected':
+                item.qc_notes = None
+            
+        db.session.commit()
+        
+        logging.info(f"✅ Inventory Transfer {transfer_id} reopened by {current_user.username}")
+        return jsonify({
+            'success': True, 
+            'message': 'Transfer reopened successfully',
             'status': 'draft'
         })
         
