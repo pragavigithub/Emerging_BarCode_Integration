@@ -29,3 +29,17 @@ allprojects {
     }
 }
 
+// Global BuildConfig fix for all React Native modules
+subprojects { subproject ->
+    afterEvaluate {
+        if (subproject.plugins.hasPlugin('com.android.library') || 
+            subproject.plugins.hasPlugin('com.android.application')) {
+            subproject.android {
+                buildFeatures {
+                    buildConfig true
+                }
+            }
+        }
+    }
+}
+

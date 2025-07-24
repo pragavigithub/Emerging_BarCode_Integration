@@ -6,7 +6,6 @@ module.exports = {
           sourceDir: '../node_modules/react-native-sqlite-storage/platforms/android',
           packageImportPath: 'io.liteglue.SQLitePluginPackage',
         },
-        // Completely remove iOS configuration to eliminate warnings
       },
     },
     'react-native-reanimated': {
