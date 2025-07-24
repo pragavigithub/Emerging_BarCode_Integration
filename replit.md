@@ -159,6 +159,8 @@ Latest Changes:
   - Fixed compileSdk and targetSdk version compatibility (updated to 34)
   - Resolved 8 androidx dependency version conflicts requiring newer Android APIs
   - Added kotlin.jvm.target.validation.mode=warning to suppress Kotlin compatibility warnings
+  - Fixed "defaultConfig contains custom BuildConfig fields, but the feature is disabled" by enabling buildConfig feature
+  - Completely removed iOS configuration from react-native-sqlite-storage to eliminate warnings
   - Created comprehensive Android build fix guides and troubleshooting documentation
   - MySQL migration scripts remain intact: complete_mysql_migration.py, MYSQL_MIGRATION_GUIDE.md
   - Application maintains dual database support: PostgreSQL for Replit, MySQL for local development
