@@ -161,11 +161,11 @@ dependencies {
 // Apply native modules but exclude problematic ones
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); 
 
-// Exclude react-native-reanimated if it gets auto-linked
+// Exclude problematic native modules from auto-linking
 project.ext.react = [
     enableHermes: true,
     enableVmCleanup: false,
-    disableAutolinking: ['react-native-reanimated']
+    disableAutolinking: ['react-native-reanimated', 'react-native-camera']
 ]
 
 applyNativeModulesAppBuildGradle(project)

@@ -152,6 +152,8 @@ Latest Changes:
   - Added react-native.config.js to fix sqlite-storage configuration warnings
   - Added packaging options to prevent duplicate library conflicts
   - Disabled react-native-reanimated autolinking in build.gradle to prevent NDK conflicts
+  - Fixed react-native-camera variant conflict by removing dependency and disabling autolinking
+  - Resolved react-native-sqlite-storage iOS configuration warning
   - Created comprehensive Android build fix guides and troubleshooting documentation
   - MySQL migration scripts remain intact: complete_mysql_migration.py, MYSQL_MIGRATION_GUIDE.md
   - Application maintains dual database support: PostgreSQL for Replit, MySQL for local development
