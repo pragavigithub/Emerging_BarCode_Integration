@@ -243,12 +243,12 @@
                                     <td>
                                         {% if grpo_doc.status in ['draft', 'rejected'] %}
                                         <div class="btn-group">
-                                            <button class="btn btn-sm btn-success" onclick="generateQRLabel('{{ item.item_code }}', '{{ item.item_name }}', '{{ item.batch_number or '' }}', {{ grpo_doc.id }})">
+                                            <button class="btn btn-sm btn-success" onclick="generateQRLabel('{{ item.item_code }}', '{{ item.item_name }}', '{{ item.batch_number or '' }}', {{ grpo_doc.id }}, '{{ grpo_doc.po_number }}')">
                                                 <i data-feather="maximize"></i> QR Label
                                             </button>
                                         </div>
                                         {% else %}
-                                        <button class="btn btn-sm btn-success" onclick="generateQRLabel('{{ item.item_code }}', '{{ item.item_name }}', '{{ item.batch_number or '' }}', {{ grpo_doc.id }})">
+                                        <button class="btn btn-sm btn-success" onclick="generateQRLabel('{{ item.item_code }}', '{{ item.item_name }}', '{{ item.batch_number or '' }}', {{ grpo_doc.id }}, '{{ grpo_doc.po_number }}')">
                                             <i data-feather="maximize"></i> Print QR Label
                                         </button>
                                         {% endif %}
@@ -501,13 +501,14 @@ function generateBarcode(itemId, itemCode) {
     });
 }
 
-// Generate QR Label
-function generateQRLabel(itemCode, itemName, batchNumber, grpoId) {
+// Generate QR Label with PO Number
+function generateQRLabel(itemCode, itemName, batchNumber, grpoId, poNumber) {
     const data = {
         item_code: itemCode,
         item_name: itemName,
         batch_number: batchNumber,
-        grpo_id: grpoId
+        grpo_id: grpoId,
+        po_number: poNumber
     };
     
     fetch('/api/generate-qr-label', {
@@ -520,7 +521,8 @@ function generateQRLabel(itemCode, itemName, batchNumber, grpoId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('QR Label generated successfully!');
+            // Create and show QR code modal
+            showQRCodeModal(data.qr_data, data.label_info);
         } else {
             alert('Error generating QR label: ' + data.error);
         }
@@ -529,6 +531,90 @@ function generateQRLabel(itemCode, itemName, batchNumber, grpoId) {
         console.error('Error:', error);
         alert('Error generating QR label');
     });
+}
+
+// Show QR Code Modal
+function showQRCodeModal(qrData, labelInfo) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('qrCodeModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.innerHTML = `
+            <div class="modal fade" id="qrCodeModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">QR Code Label</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <div id="qrcode"></div>
+                            <div class="mt-3">
+                                <p><strong>Item Code:</strong> <span id="qr-item-code"></span></p>
+                                <p><strong>PO Number:</strong> <span id="qr-po-number"></span></p>
+                                <p><strong>Item Name:</strong> <span id="qr-item-name"></span></p>
+                                <p><strong>Batch Number:</strong> <span id="qr-batch-number"></span></p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary" onclick="printQRLabel()">Print Label</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // Update modal content
+    document.getElementById('qr-item-code').textContent = labelInfo.item_code;
+    document.getElementById('qr-po-number').textContent = labelInfo.po_number;
+    document.getElementById('qr-item-name').textContent = labelInfo.item_name;
+    document.getElementById('qr-batch-number').textContent = labelInfo.batch_number || 'N/A';
+    
+    // Generate QR code using QRCode.js library
+    const qrCodeDiv = document.getElementById('qrcode');
+    qrCodeDiv.innerHTML = '';
+    
+    // Load QRCode library if not already loaded
+    if (typeof QRCode === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+        script.onload = function() {
+            generateQRCode(qrCodeDiv, qrData);
+        };
+        document.head.appendChild(script);
+    } else {
+        generateQRCode(qrCodeDiv, qrData);
+    }
+    
+    // Show modal
+    const bsModal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
+    bsModal.show();
+}
+
+// Generate QR Code
+function generateQRCode(container, data) {
+    try {
+        QRCode.toCanvas(data, { width: 200, height: 200 }, function (error, canvas) {
+            if (error) {
+                console.error('QR Code generation error:', error);
+                container.innerHTML = '<p class="text-danger">Error generating QR code</p>';
+            } else {
+                container.innerHTML = '';
+                container.appendChild(canvas);
+            }
+        });
+    } catch (error) {
+        console.error('QR Code library error:', error);
+        container.innerHTML = '<p class="text-info">QR Code: ' + data + '</p>';
+    }
+}
+
+// Print QR Label
+function printQRLabel() {
+    window.print();
 }
 
 // GRPO submission functions

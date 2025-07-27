@@ -140,6 +140,16 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 27, 2025. QR Code Generation Enhancement + Replit Migration Complete - COMPLETED:
+  - Successfully migrated from Replit Agent to Replit environment with PostgreSQL database
+  - Enhanced QR code generation for both GRPO and Inventory Transfer items
+  - Added PO number and Transfer number to QR code data as requested by user
+  - Implemented comprehensive QR code modal with printable labels
+  - QR codes now include: item_code, po_number (for GRPO), transfer_number (for transfers), item_name, batch_number
+  - Added QR generation buttons to all GRPO and Inventory Transfer item rows
+  - Maintained MySQL migration scripts and dual database support as per user preference
+  - Application running successfully on gunicorn server at port 5000 with PostgreSQL
+  - QR codes can be scanned and display item information including document numbers
 - July 24, 2025. Replit Migration Complete + React Native Android NDK Fix - COMPLETED:
   - Successfully migrated from Replit Agent to Replit environment with PostgreSQL database
   - Fixed LSP diagnostics and model configuration issues for proper Flask-SQLAlchemy compatibility

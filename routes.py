@@ -229,16 +229,18 @@ def generate_qr_label():
     try:
         data = request.get_json()
         item_code = data.get('item_code')
-        item_name = data.get('item_name')
-        batch_number = data.get('batch_number')
+        item_name = data.get('item_name', '')
+        batch_number = data.get('batch_number', '')
         grpo_id = data.get('grpo_id')
+        po_number = data.get('po_number', '')
         
         if not item_code:
             return jsonify({'success': False, 'error': 'Item code is required'}), 400
         
-        # Generate QR code data
+        # Generate QR code data with PO number as requested
         qr_data = {
             'item_code': item_code,
+            'po_number': po_number,
             'item_name': item_name,
             'batch_number': batch_number,
             'grpo_id': grpo_id,
@@ -254,6 +256,7 @@ def generate_qr_label():
             'qr_data': qr_string,
             'label_info': {
                 'item_code': item_code,
+                'po_number': po_number,
                 'item_name': item_name,
                 'batch_number': batch_number,
                 'grpo_id': grpo_id
@@ -262,6 +265,51 @@ def generate_qr_label():
         
     except Exception as e:
         logging.error(f"Error generating QR label: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/generate-transfer-qr-label', methods=['POST'])
+@login_required
+def generate_transfer_qr_label():
+    """Generate QR code label for Inventory Transfer item"""
+    try:
+        data = request.get_json()
+        item_code = data.get('item_code')
+        item_name = data.get('item_name', '')
+        batch_number = data.get('batch_number', '')
+        transfer_id = data.get('transfer_id')
+        transfer_number = data.get('transfer_number', '')
+        
+        if not item_code:
+            return jsonify({'success': False, 'error': 'Item code is required'}), 400
+        
+        # Generate QR code data with transfer number as requested
+        qr_data = {
+            'item_code': item_code,
+            'transfer_number': transfer_number,
+            'item_name': item_name,
+            'batch_number': batch_number,
+            'transfer_id': transfer_id,
+            'created_at': datetime.utcnow().isoformat(),
+            'type': 'TRANSFER_ITEM'
+        }
+        
+        # Convert to QR code string
+        qr_string = json.dumps(qr_data, separators=(',', ':'))
+        
+        return jsonify({
+            'success': True,
+            'qr_data': qr_string,
+            'label_info': {
+                'item_code': item_code,
+                'transfer_number': transfer_number,
+                'item_name': item_name,
+                'batch_number': batch_number,
+                'transfer_id': transfer_id
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Error generating transfer QR label: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/grpo/<int:grpo_id>/add_item', methods=['POST'])
