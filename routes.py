@@ -272,19 +272,9 @@ def generate_transfer_qr_label():
         if not item_code:
             return jsonify({'success': False, 'error': 'Item code is required'}), 400
         
-        # Generate QR code data with transfer number as requested
-        qr_data = {
-            'item_code': item_code,
-            'transfer_number': transfer_number,
-            'item_name': item_name,
-            'batch_number': batch_number,
-            'transfer_id': transfer_id,
-            'created_at': datetime.utcnow().isoformat(),
-            'type': 'TRANSFER_ITEM'
-        }
-        
-        # Convert to QR code string
-        qr_string = json.dumps(qr_data, separators=(',', ':'))
+        # Generate simple QR code data format for easy scanning (same as GRPO format)
+        # Format: ItemCode|TransferNumber|ItemName|BatchNumber
+        qr_string = f"{item_code}|{transfer_number}|{item_name}|{batch_number or 'N/A'}"
         
         return jsonify({
             'success': True,
