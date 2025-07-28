@@ -29,7 +29,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
-            if user.is_active:
+            if user.user_is_active:
                 # Update branch - use provided branch, default branch, or 'HQ001'
                 if branch_id:
                     user.branch_id = branch_id
@@ -169,9 +169,9 @@ def create_grpo():
         date_str = po_data.get('DocDate')
         try:
             # Try ISO format first (SAP B1 format: 2025-01-08T00:00:00Z)
-            if 'T' in date_str:
+            if date_str and 'T' in date_str:
                 po_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            else:
+            elif date_str:
                 # Simple date format
                 po_date = datetime.strptime(date_str, '%Y-%m-%d')
         except (ValueError, TypeError) as e:
@@ -356,7 +356,7 @@ def add_grpo_item(grpo_id):
         po_quantity=po_line_item.get('Quantity') if po_line_item else quantity,
         open_quantity=po_line_item.get('OpenQuantity') if po_line_item else quantity,
         received_quantity=quantity,
-        unit_of_measure=po_line_item.get('UoMCode') or po_line_item.get('UoMEntry') or request.form.get('unit_of_measure', 'EA'),
+        unit_of_measure=(po_line_item.get('UoMCode') if po_line_item else None) or (po_line_item.get('UoMEntry') if po_line_item else None) or request.form.get('unit_of_measure', 'EA'),
         unit_price=po_line_item.get('Price') if po_line_item else 0,
         bin_location=bin_location,
         batch_number=batch_number,
