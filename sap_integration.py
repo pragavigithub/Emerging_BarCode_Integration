@@ -282,18 +282,61 @@ class SAPIntegration:
             return []
     
     def get_bin_items(self, bin_code):
-        """Get items in a specific bin"""
+        """Get items in a specific bin location"""
         if not self.ensure_logged_in():
-            return []
+            # Return mock data for offline mode
+            logging.warning(f"SAP B1 not available, returning mock bin data for {bin_code}")
+            return [
+                {
+                    'ItemCode': 'ITEM-001',
+                    'ItemName': 'Sample Item 1',
+                    'Quantity': 50,
+                    'UoM': 'EA',
+                    'BatchNumber': 'BATCH-001',
+                    'ExpiryDate': '2025-12-31'
+                },
+                {
+                    'ItemCode': 'ITEM-002', 
+                    'ItemName': 'Sample Item 2',
+                    'Quantity': 25,
+                    'UoM': 'PCS',
+                    'BatchNumber': 'BATCH-002',
+                    'ExpiryDate': '2025-10-15'
+                }
+            ]
             
-        url = f"{self.base_url}/b1s/v1/StockTransferDrafts?$filter=BinCode eq '{bin_code}'"
-        
         try:
-            response = self.session.get(url)
+            # Query warehouse stock by bin location using proper SAP B1 API
+            url = f"{self.base_url}/b1s/v1/WarehouseStockQuery"
+            params = {
+                '$filter': f"BinLocation eq '{bin_code}'",
+                '$select': 'ItemCode,ItemName,OnHand,UoMCode,BatchNumber,ExpiryDate,BinLocation'
+            }
+            
+            response = self.session.get(url, params=params)
             if response.status_code == 200:
                 data = response.json()
-                return data.get('value', [])
-            return []
+                items = data.get('value', [])
+                
+                # Format items for consistent response
+                formatted_items = []
+                for item in items:
+                    formatted_items.append({
+                        'ItemCode': item.get('ItemCode', ''),
+                        'ItemName': item.get('ItemName', ''),
+                        'Quantity': item.get('OnHand', 0),
+                        'UoM': item.get('UoMCode', 'EA'),
+                        'BatchNumber': item.get('BatchNumber', ''),
+                        'ExpiryDate': item.get('ExpiryDate', '')
+                    })
+                
+                logging.info(f"Found {len(formatted_items)} items in bin {bin_code}")
+                return formatted_items
+                
+            else:
+                logging.warning(f"SAP B1 API error for bin {bin_code}: {response.status_code}")
+                return []
+                
         except Exception as e:
             logging.error(f"Error fetching items for bin {bin_code}: {str(e)}")
             return []

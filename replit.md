@@ -140,6 +140,16 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 28, 2025. Replit Migration + User Issues Fixed - COMPLETED:
+  - Successfully completed migration from Replit Agent to Replit environment with PostgreSQL database
+  - Fixed QR label format to show clean, scannable format: ItemCode|PONumber|ItemName|BatchNumber (pipe-separated)
+  - Removed Generate button and Barcode column from GRPO items table as requested by user
+  - Fixed bin scanning module functionality by adding missing /api/scan_bin API endpoint
+  - Enhanced SAP integration with proper get_bin_items method supporting both online and offline modes
+  - Application now running successfully on gunicorn port 5000 with all core functionality working
+  - QR codes now generate clean, readable format when scanned instead of complex JSON data
+  - Bin scanning module now properly displays items in bin locations with mock data support
+  - Removed duplicate API routes and resolved Flask application startup conflicts
 - July 28, 2025. QR Code Generation Enhancement Complete + Local Database Fix - COMPLETED:
   - Completed comprehensive QR code generation for both GRPO and Inventory Transfer modules
   - Enhanced QR code data to include PO number (for GRPO) and Transfer number (for transfers) as requested

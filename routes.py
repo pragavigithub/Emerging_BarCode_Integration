@@ -237,19 +237,9 @@ def generate_qr_label():
         if not item_code:
             return jsonify({'success': False, 'error': 'Item code is required'}), 400
         
-        # Generate QR code data with PO number as requested
-        qr_data = {
-            'item_code': item_code,
-            'po_number': po_number,
-            'item_name': item_name,
-            'batch_number': batch_number,
-            'grpo_id': grpo_id,
-            'created_at': datetime.utcnow().isoformat(),
-            'type': 'GRPO_ITEM'
-        }
-        
-        # Convert to QR code string
-        qr_string = json.dumps(qr_data, separators=(',', ':'))
+        # Generate simple QR code data format for easy scanning
+        # Format: ItemCode|PONumber|ItemName|BatchNumber
+        qr_string = f"{item_code}|{po_number}|{item_name}|{batch_number or 'N/A'}"
         
         return jsonify({
             'success': True,
@@ -1183,13 +1173,39 @@ def bin_scanning():
 @app.route('/api/scan_bin', methods=['POST'])
 @login_required
 def scan_bin():
-    bin_code = request.json['bin_code']
-    
-    # Get items from SAP B1
-    sap = SAPIntegration()
-    items = sap.get_bin_items(bin_code)
-    
-    return jsonify({'items': items})
+    """Scan bin to get all items in the bin location"""
+    try:
+        data = request.get_json()
+        bin_code = data.get('bin_code', '').strip()
+        
+        if not bin_code:
+            return jsonify({'success': False, 'error': 'Bin code is required'}), 400
+        
+        # Get items from SAP B1 for the bin location
+        sap = SAPIntegration()
+        bin_items = sap.get_bin_items(bin_code)
+        
+        if bin_items is None:
+            # If SAP connection fails, return empty result for now
+            return jsonify({
+                'success': True,
+                'bin_code': bin_code,
+                'items': [],
+                'message': 'SAP connection not available - offline mode'
+            })
+        
+        return jsonify({
+            'success': True,
+            'bin_code': bin_code,
+            'items': bin_items,
+            'total_items': len(bin_items) if bin_items else 0
+        })
+        
+    except Exception as e:
+        logging.error(f"Error scanning bin {bin_code}: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 
 @app.route('/label_printing')
 @login_required

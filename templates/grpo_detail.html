@@ -164,7 +164,6 @@
                                     <th>Warehouse</th>
                                     <th>Batch</th>
                                     <th>Expiry</th>
-                                    <th>Barcode</th>
                                     <th>QC Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -220,17 +219,7 @@
                                         {{ item.expiration_date.strftime('%Y-%m-%d') if item.expiration_date else '-' }}
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        {% if item.generated_barcode %}
-                                            <span class="badge bg-success">{{ item.generated_barcode }}</span>
-                                        {% elif grpo_doc.status in ['draft', 'rejected'] %}
-                                            <button class="btn btn-xs btn-success" onclick="generateBarcode({{ item.id }}, '{{ item.item_code }}')">
-                                                <i data-feather="plus"></i> Generate
-                                            </button>
-                                        {% else %}
-                                            {{ item.supplier_barcode or 'No barcode' }}
-                                        {% endif %}
-                                    </td>
+
                                     <td>
                                         {% if item.qc_status == 'pending' %}
                                             <span class="badge bg-warning">Pending</span>
