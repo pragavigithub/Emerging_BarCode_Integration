@@ -299,10 +299,10 @@ DATABASE_URL=mysql+pymysql://{mysql_config['user']}:{mysql_config['password']}@{
 SESSION_SECRET=your-secret-key-here
 
 # SAP B1 Configuration (Optional)
-SAP_B1_SERVER=https://your-sap-server:50000/b1s/v1
-SAP_B1_USERNAME=your-sap-username
-SAP_B1_PASSWORD=your-sap-password
-SAP_B1_COMPANY_DB=your-company-db
+SAP_B1_SERVER=https://192.168.0.194:50000
+SAP_B1_USERNAME=manager
+SAP_B1_PASSWORD=1422
+SAP_B1_COMPANY_DB=EINV-TESTDB-LIVE-HUST
 """
     
     with open('.env', 'w') as f:
