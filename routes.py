@@ -1474,6 +1474,8 @@ def validate_po():
     else:
         return jsonify({'valid': False, 'error': 'Purchase Order not found'})
 
+
+
 @app.route('/api/validate_item', methods=['POST'])
 @login_required
 def validate_item():
