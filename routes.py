@@ -6,8 +6,10 @@ import logging
 import json
 
 from app import app, db, login_manager
-from models import User, GRPODocument, GRPOItem, InventoryTransfer, InventoryTransferItem, PickList, PickListItem, InventoryCount, InventoryCountItem, BarcodeLabel
+from models import User, GRPODocument, GRPOItem, InventoryTransfer, InventoryTransferItem, PickList, PickListItem, InventoryCount, InventoryCountItem, BarcodeLabel, BinScanningLog
 from sap_integration import SAPIntegration
+
+# BinScanningLog is now imported above
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -1177,12 +1179,11 @@ def scan_bin():
         
         # Log the scan activity
         try:
-            from models import BinScanningLog
             scan_log = BinScanningLog(
                 bin_code=bin_code,
                 user_id=current_user.id,
                 scan_type='BIN_SCAN',
-                scan_data=f"Scanned bin {bin_code}",
+                scan_data=f"Scanned bin {bin_code} - Found {len(items)} items",
                 items_found=len(items)
             )
             db.session.add(scan_log)

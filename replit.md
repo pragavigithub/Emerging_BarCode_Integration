@@ -140,16 +140,20 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
-- July 28, 2025. Replit Migration + User Issues Fixed - COMPLETED:
+- July 28, 2025. Replit Migration + Enhanced Bin Scanning with SAP API Integration - COMPLETED:
   - Successfully completed migration from Replit Agent to Replit environment with PostgreSQL database
-  - Fixed QR label format to show clean, scannable format: ItemCode|PONumber|ItemName|BatchNumber (pipe-separated)
-  - Removed Generate button and Barcode column from GRPO items table as requested by user
-  - Fixed bin scanning module functionality by adding missing /api/scan_bin API endpoint
-  - Enhanced SAP integration with proper get_bin_items method supporting both online and offline modes
-  - Application now running successfully on gunicorn port 5000 with all core functionality working
-  - QR codes now generate clean, readable format when scanned instead of complex JSON data
-  - Bin scanning module now properly displays items in bin locations with mock data support
-  - Removed duplicate API routes and resolved Flask application startup conflicts
+  - Restored MySQL configuration support for local development as requested by user
+  - Created comprehensive single MySQL migration file (complete_mysql_setup_migration.py) with .env creation and all table schemas
+  - Enhanced bin scanning functionality with proper SAP B1 API integration using user's provided API patterns:
+    * BinLocations API: `?$filter=BinCode eq 'BIN_CODE'` for bin information
+    * Warehouses API: `?$select=BusinessPlaceID,WarehouseCode,DefaultBin&$filter=WarehouseCode eq 'WAREHOUSE'` for warehouse details
+    * BatchNumberDetails API: `?$filter=SystemNumber eq SYSTEM_NUMBER` for batch items
+    * ItemWhsStock API: `?$filter=ItemCode eq 'ITEM' and WarehouseCode eq 'WAREHOUSE'` for OnHand/OnStock quantities
+  - Fixed bin scanning API endpoint (/api/scan_bin) to return proper OnStock/OnHand item details by warehouse and bin code
+  - Applied enhanced bin scanning fix with proper logging and error handling
+  - Application running successfully on gunicorn port 5000 with both PostgreSQL (Replit) and MySQL (local) support
+  - Bin scanning now provides real-time inventory data with batch information, expiry dates, and stock quantities
+  - Fixed import issues and model field mapping for BinScanningLog functionality
 - July 28, 2025. QR Code Generation Enhancement Complete + Local Database Fix - COMPLETED:
   - Completed comprehensive QR code generation for both GRPO and Inventory Transfer modules
   - Enhanced QR code data to include PO number (for GRPO) and Transfer number (for transfers) as requested
