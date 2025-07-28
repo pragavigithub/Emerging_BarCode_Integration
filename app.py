@@ -39,35 +39,41 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 database_url = None
 db_type = "unknown"
 
-# Priority 1: MySQL (user's preferred database) - disabled for Replit environment
-# try:
-#     if (os.environ.get('DATABASE_URL', '').startswith('mysql')) or (
-#         os.environ.get('MYSQL_HOST') and 
-#         os.environ.get('MYSQL_USER') and 
-#         os.environ.get('MYSQL_PASSWORD') and 
-#         os.environ.get('MYSQL_DATABASE')
-#     ):
-#         if os.environ.get('DATABASE_URL', '').startswith('mysql'):
-#             database_url = os.environ.get('DATABASE_URL')
-#             db_type = "mysql"
-#             logging.info("✅ Using MySQL database from DATABASE_URL")
-#         else:
-#             mysql_user = os.environ.get('MYSQL_USER')
-#             mysql_password = os.environ.get('MYSQL_PASSWORD')
-#             mysql_host = os.environ.get('MYSQL_HOST')
-#             mysql_port = os.environ.get('MYSQL_PORT', '3306')
-#             mysql_database = os.environ.get('MYSQL_DATABASE')
-#             
-#             # Validate MySQL parameters
-#             if mysql_user and mysql_password and mysql_host and mysql_database:
-#                 database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
-#                 db_type = "mysql"
-#                 logging.info(f"✅ Using MySQL database: {mysql_host}:{mysql_port}/{mysql_database}")
-#             else:
-#                 logging.warning("⚠️ MySQL configuration incomplete - missing required parameters")
-# except Exception as e:
-#     logging.error(f"❌ MySQL configuration error: {e}")
-logging.info("🔧 MySQL disabled for Replit environment - using PostgreSQL")
+# Priority 1: MySQL (user's preferred database) - keep for local development
+try:
+    if (os.environ.get('DATABASE_URL', '').startswith('mysql')) or (
+        os.environ.get('MYSQL_HOST') and 
+        os.environ.get('MYSQL_USER') and 
+        os.environ.get('MYSQL_PASSWORD') and 
+        os.environ.get('MYSQL_DATABASE')
+    ):
+        if os.environ.get('DATABASE_URL', '').startswith('mysql'):
+            database_url = os.environ.get('DATABASE_URL')
+            db_type = "mysql"
+            logging.info("✅ Using MySQL database from DATABASE_URL")
+        else:
+            mysql_user = os.environ.get('MYSQL_USER')
+            mysql_password = os.environ.get('MYSQL_PASSWORD')
+            mysql_host = os.environ.get('MYSQL_HOST')
+            mysql_port = os.environ.get('MYSQL_PORT', '3306')
+            mysql_database = os.environ.get('MYSQL_DATABASE')
+            
+            # URL encode password if it contains special characters
+            from urllib.parse import quote_plus
+            mysql_password_encoded = quote_plus(mysql_password) if mysql_password else mysql_password
+            
+            # Validate MySQL parameters
+            if mysql_user and mysql_password and mysql_host and mysql_database:
+                database_url = f"mysql+pymysql://{mysql_user}:{mysql_password_encoded}@{mysql_host}:{mysql_port}/{mysql_database}"
+                db_type = "mysql"
+                logging.info(f"✅ Using MySQL database: {mysql_host}:{mysql_port}/{mysql_database}")
+            else:
+                logging.warning("⚠️ MySQL configuration incomplete - missing required parameters")
+except Exception as e:
+    logging.error(f"❌ MySQL configuration error: {e}")
+
+if not database_url:
+    logging.info("🔧 MySQL not configured - checking PostgreSQL")
 
 # Priority 2: PostgreSQL (for Replit deployment when MySQL not available)
 if not database_url and os.environ.get("DATABASE_URL"):

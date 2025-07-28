@@ -1171,9 +1171,9 @@ def scan_bin():
         if not bin_code:
             return jsonify({'success': False, 'error': 'Bin code is required'}), 400
         
-        # Get items from SAP integration with enhanced quantity data
+        # Get items from SAP integration with enhanced OnStock/OnHand data
         sap = SAPIntegration()
-        items = sap.get_bin_items_with_quantities(bin_code)
+        items = sap.get_bin_items(bin_code)
         
         # Log the scan activity
         try:
