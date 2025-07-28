@@ -39,12 +39,41 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 database_url = None
 db_type = "unknown"
 
-# For Replit deployment, prioritize PostgreSQL
-if os.environ.get("DATABASE_URL"):
-    # PostgreSQL configuration (Replit environment)
+# Priority 1: MySQL (user's preferred database) - only if properly configured
+try:
+    if (os.environ.get('DATABASE_URL', '').startswith('mysql')) or (
+        os.environ.get('MYSQL_HOST') and 
+        os.environ.get('MYSQL_USER') and 
+        os.environ.get('MYSQL_PASSWORD') and 
+        os.environ.get('MYSQL_DATABASE')
+    ):
+        if os.environ.get('DATABASE_URL', '').startswith('mysql'):
+            database_url = os.environ.get('DATABASE_URL')
+            db_type = "mysql"
+            logging.info("✅ Using MySQL database from DATABASE_URL")
+        else:
+            mysql_user = os.environ.get('MYSQL_USER')
+            mysql_password = os.environ.get('MYSQL_PASSWORD')
+            mysql_host = os.environ.get('MYSQL_HOST')
+            mysql_port = os.environ.get('MYSQL_PORT', '3306')
+            mysql_database = os.environ.get('MYSQL_DATABASE')
+            
+            # Validate MySQL parameters
+            if mysql_user and mysql_password and mysql_host and mysql_database:
+                database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
+                db_type = "mysql"
+                logging.info(f"✅ Using MySQL database: {mysql_host}:{mysql_port}/{mysql_database}")
+            else:
+                logging.warning("⚠️ MySQL configuration incomplete - missing required parameters")
+except Exception as e:
+    logging.error(f"❌ MySQL configuration error: {e}")
+
+# Priority 2: PostgreSQL (for Replit deployment when MySQL not available)
+if not database_url and os.environ.get("DATABASE_URL"):
     database_url = os.environ.get("DATABASE_URL")
     db_type = "postgresql"
     logging.info("✅ Using PostgreSQL database for Replit deployment")
+    logging.info("💡 To use MySQL instead, run: python setup_mysql_database.py")
 
 if database_url:
     # Production database configuration

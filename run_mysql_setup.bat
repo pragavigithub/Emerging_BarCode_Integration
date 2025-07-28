@@ -1,22 +1,27 @@
 @echo off
-echo =====================================
-echo WMS MySQL Database Setup
-echo =====================================
+echo ================================================
+echo MySQL Database Setup for Warehouse Management System
+echo ================================================
 echo.
-echo This script will set up MySQL database for WMS application
-echo Make sure MySQL is installed and running on your system
+echo This script will help you set up MySQL database
+echo for your warehouse management system.
+echo.
+echo Prerequisites:
+echo - MySQL Server installed and running
+echo - Python 3.8+ installed
+echo - pip package manager
 echo.
 pause
 
 echo Installing required Python packages...
-pip install mysql-connector-python pymysql
+pip install pymysql mysql-connector-python python-dotenv
 
 echo.
-echo Running MySQL setup script...
-python setup_mysql_local.py
+echo Starting MySQL setup...
+python setup_mysql_database.py
 
 echo.
-echo Setup completed!
-echo You can now run your WMS application with MySQL database
+echo Setup complete! 
+echo To start the application with MySQL, restart your Flask server.
 echo.
 pause
