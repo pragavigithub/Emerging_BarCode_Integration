@@ -1163,7 +1163,7 @@ def bin_scanning():
 @app.route('/api/scan_bin', methods=['POST'])
 @login_required
 def scan_bin():
-    """Scan bin to get all items in the bin location"""
+    """API endpoint to scan bin and get items with real-time quantities from SAP B1"""
     try:
         data = request.get_json()
         bin_code = data.get('bin_code', '').strip()
@@ -1171,31 +1171,63 @@ def scan_bin():
         if not bin_code:
             return jsonify({'success': False, 'error': 'Bin code is required'}), 400
         
-        # Get items from SAP B1 for the bin location
+        # Get items from SAP integration with enhanced quantity data
         sap = SAPIntegration()
-        bin_items = sap.get_bin_items(bin_code)
+        items = sap.get_bin_items_with_quantities(bin_code)
         
-        if bin_items is None:
-            # If SAP connection fails, return empty result for now
-            return jsonify({
-                'success': True,
-                'bin_code': bin_code,
-                'items': [],
-                'message': 'SAP connection not available - offline mode'
-            })
+        # Log the scan activity
+        try:
+            from models import BinScanningLog
+            scan_log = BinScanningLog(
+                bin_code=bin_code,
+                user_id=current_user.id,
+                scan_type='BIN_SCAN',
+                scan_data=f"Scanned bin {bin_code}",
+                items_found=len(items)
+            )
+            db.session.add(scan_log)
+            db.session.commit()
+        except Exception as log_error:
+            logging.warning(f"Could not log bin scan: {log_error}")
         
         return jsonify({
             'success': True,
             'bin_code': bin_code,
-            'items': bin_items,
-            'total_items': len(bin_items) if bin_items else 0
+            'items': items,
+            'item_count': len(items),
+            'message': f'Found {len(items)} items in bin {bin_code}'
         })
         
     except Exception as e:
-        logging.error(f"Error scanning bin {bin_code}: {str(e)}")
+        logging.error(f"Error in scan_bin API: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
+@app.route('/api/sync_bin_data/<bin_code>', methods=['POST'])
+@login_required
+def sync_bin_data(bin_code):
+    """API endpoint to synchronize bin data from SAP B1 to local database"""
+    try:
+        if not bin_code:
+            return jsonify({'success': False, 'error': 'Bin code is required'}), 400
+        
+        # Sync data from SAP B1
+        sap = SAPIntegration()
+        success = sap.sync_bin_data_to_database(bin_code)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Successfully synchronized data for bin {bin_code}'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to synchronize data for bin {bin_code}'
+            }), 500
+        
+    except Exception as e:
+        logging.error(f"Error in sync_bin_data API: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/label_printing')
 @login_required

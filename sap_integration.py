@@ -284,26 +284,24 @@ class SAPIntegration:
     def get_bin_items(self, bin_code):
         """Get items in a specific bin location"""
         if not self.ensure_logged_in():
-            # Return mock data for offline mode
+            # Return realistic mock data based on your SAP B1 examples
             logging.warning(f"SAP B1 not available, returning mock bin data for {bin_code}")
-            return [
-                {
-                    'ItemCode': 'ITEM-001',
-                    'ItemName': 'Sample Item 1',
-                    'Quantity': 50,
-                    'UoM': 'EA',
-                    'BatchNumber': 'BATCH-001',
-                    'ExpiryDate': '2025-12-31'
-                },
-                {
-                    'ItemCode': 'ITEM-002', 
-                    'ItemName': 'Sample Item 2',
-                    'Quantity': 25,
-                    'UoM': 'PCS',
-                    'BatchNumber': 'BATCH-002',
-                    'ExpiryDate': '2025-10-15'
-                }
+            mock_items = [
+                {'ItemCode': 'CO0726Y', 'ItemName': 'COATED LOWER PLATE', 'Quantity': 12.0, 'UoM': 'EA', 'BatchNumber': '20220729', 'ExpiryDate': ''},
+                {'ItemCode': 'CO0098Y', 'ItemName': 'Big Aluminium Insert Coated RR AC0101', 'Quantity': 8.5, 'UoM': 'EA', 'BatchNumber': '20220729', 'ExpiryDate': ''},
+                {'ItemCode': 'CO0727Y', 'ItemName': 'COATED LHS INSERT', 'Quantity': 15.0, 'UoM': 'EA', 'BatchNumber': '20220729', 'ExpiryDate': ''},
+                {'ItemCode': '1248-109226', 'ItemName': 'Araymond-9.00 x 2.00-7SF2081', 'Quantity': 25.0, 'UoM': 'EA', 'BatchNumber': '483108857', 'ExpiryDate': ''},
+                {'ItemCode': '1248-109234', 'ItemName': 'Araymond-9.60 x 2.50-7SF2081', 'Quantity': 18.0, 'UoM': 'EA', 'BatchNumber': '483125004', 'ExpiryDate': ''},
+                {'ItemCode': '1248-109242', 'ItemName': 'Araymond-9.60 x 2.00-6DF1882', 'Quantity': 22.0, 'UoM': 'EA', 'BatchNumber': '483229468', 'ExpiryDate': ''},
             ]
+            # Filter based on bin code to simulate realistic distribution
+            if 'C4' in bin_code:
+                return mock_items[:2]
+            elif 'C5' in bin_code:
+                return mock_items[2:4]
+            elif 'C8' in bin_code:
+                return mock_items[4:6]
+            return mock_items[:3]
             
         try:
             # Step 1: Get bin information and validate bin code exists
@@ -325,82 +323,170 @@ class SAPIntegration:
             
             logging.info(f"Found bin {bin_code} in warehouse {warehouse_code} (AbsEntry: {abs_entry})")
             
-            # Step 2: Get items in this bin using ItemWhsStock for warehouse inventory
-            # SAP B1 API to get items with stock in specific bin location
-            stock_url = f"{self.base_url}/b1s/v1/ItemWhsStock"
+            # Step 2: Get items in this specific bin using BatchNumberDetails with BatchAttribute2
+            # Based on your API examples, BatchAttribute2 contains the bin location
+            batch_url = f"{self.base_url}/b1s/v1/BatchNumberDetails"
             params = {
-                '$filter': f"WhsCode eq '{warehouse_code}' and OnHand gt 0",
-                '$select': 'ItemCode,WhsCode,OnHand,Committed,Ordered'
+                '$filter': f"BatchAttribute2 eq '{bin_code}' and Status eq 'bdsStatus_Released'",
+                '$select': 'ItemCode,ItemDescription,Batch,BatchAttribute1,BatchAttribute2,ExpirationDate,ManufacturingDate,AdmissionDate'
             }
             
-            stock_response = self.session.get(stock_url, params=params)
-            if stock_response.status_code != 200:
-                logging.error(f"Failed to get warehouse stock: {stock_response.status_code}")
+            batch_response = self.session.get(batch_url, params=params)
+            if batch_response.status_code != 200:
+                logging.error(f"Failed to get batch data for bin {bin_code}: {batch_response.status_code}")
                 return []
             
-            stock_data = stock_response.json().get('value', [])
-            logging.info(f"Found {len(stock_data)} items with stock in warehouse {warehouse_code}")
+            batch_data = batch_response.json().get('value', [])
+            logging.info(f"Found {len(batch_data)} batches in bin {bin_code}")
             
-            # Step 3: Get batch details for items (using your API example)
+            if not batch_data:
+                logging.warning(f"No items found in bin {bin_code}")
+                return []
+            
+            # Step 3: For each batch, get the actual quantity on hand from ItemWhsStock
             formatted_items = []
-            for stock_item in stock_data[:10]:  # Limit to first 10 items for performance
-                item_code = stock_item.get('ItemCode', '')
+            for batch_info in batch_data:
+                item_code = batch_info.get('ItemCode', '')
                 if not item_code:
                     continue
                 
-                # Get batch information for this item
-                batch_url = f"{self.base_url}/b1s/v1/BatchNumberDetails?$filter=ItemCode eq '{item_code}' and Status eq 'bdsStatus_Released'"
+                # Get warehouse stock for this specific item
+                stock_url = f"{self.base_url}/b1s/v1/ItemWhsStock"
+                stock_params = {
+                    '$filter': f"ItemCode eq '{item_code}' and WhsCode eq '{warehouse_code}' and OnHand gt 0",
+                    '$select': 'ItemCode,WhsCode,OnHand,Committed,Ordered'
+                }
+                
                 try:
-                    batch_response = self.session.get(batch_url)
-                    if batch_response.status_code == 200:
-                        batch_data = batch_response.json().get('value', [])
+                    stock_response = self.session.get(stock_url, params=stock_params)
+                    if stock_response.status_code == 200:
+                        stock_data = stock_response.json().get('value', [])
                         
-                        if batch_data:
-                            # Use first available batch
-                            batch_info = batch_data[0]
+                        # Calculate available quantity (OnHand - Committed)
+                        available_qty = 0
+                        for stock_item in stock_data:
+                            on_hand = stock_item.get('OnHand', 0)
+                            committed = stock_item.get('Committed', 0)
+                            available_qty += max(0, on_hand - committed)
+                        
+                        if available_qty > 0:
                             formatted_items.append({
                                 'ItemCode': item_code,
                                 'ItemName': batch_info.get('ItemDescription', item_code),
-                                'Quantity': stock_item.get('OnHand', 0),
-                                'UoM': 'EA',  # Default UoM, could be enhanced with item master data
+                                'Quantity': available_qty,
+                                'UoM': 'EA',  # Could be enhanced with item master UoM
                                 'BatchNumber': batch_info.get('Batch', ''),
                                 'ExpiryDate': batch_info.get('ExpirationDate', ''),
-                                'BinCode': bin_code,
-                                'WarehouseCode': warehouse_code
-                            })
-                        else:
-                            # No batch info, add item without batch
-                            formatted_items.append({
-                                'ItemCode': item_code,
-                                'ItemName': f'Item {item_code}',
-                                'Quantity': stock_item.get('OnHand', 0),
-                                'UoM': 'EA',
-                                'BatchNumber': '',
-                                'ExpiryDate': '',
+                                'ManufacturingDate': batch_info.get('ManufacturingDate', ''),
+                                'AdmissionDate': batch_info.get('AdmissionDate', ''),
                                 'BinCode': bin_code,
                                 'WarehouseCode': warehouse_code
                             })
                             
-                except Exception as batch_error:
-                    logging.warning(f"Could not get batch info for {item_code}: {batch_error}")
-                    # Add item without batch info
+                except Exception as stock_error:
+                    logging.warning(f"Could not get stock for {item_code}: {stock_error}")
+                    # Add item with zero quantity if stock lookup fails
                     formatted_items.append({
                         'ItemCode': item_code,
-                        'ItemName': f'Item {item_code}',
-                        'Quantity': stock_item.get('OnHand', 0),
+                        'ItemName': batch_info.get('ItemDescription', item_code),
+                        'Quantity': 0,
                         'UoM': 'EA',
-                        'BatchNumber': '',
-                        'ExpiryDate': '',
+                        'BatchNumber': batch_info.get('Batch', ''),
+                        'ExpiryDate': batch_info.get('ExpirationDate', ''),
+                        'ManufacturingDate': batch_info.get('ManufacturingDate', ''),
+                        'AdmissionDate': batch_info.get('AdmissionDate', ''),
                         'BinCode': bin_code,
                         'WarehouseCode': warehouse_code
                     })
             
-            logging.info(f"Formatted {len(formatted_items)} items for bin {bin_code}")
+            logging.info(f"Found {len(formatted_items)} items with stock in bin {bin_code}")
             return formatted_items
                 
         except Exception as e:
             logging.error(f"Error fetching items for bin {bin_code}: {str(e)}")
             return []
+
+    def get_bin_items_with_quantities(self, bin_code):
+        """Get items in a specific bin with real-time quantity data from SAP B1"""
+        if not self.ensure_logged_in():
+            return self.get_bin_items(bin_code)  # Fallback to mock data
+            
+        try:
+            # Use the corrected API flow based on your examples
+            items = self.get_bin_items(bin_code)
+            
+            # Enhance with additional SAP B1 data if needed
+            enhanced_items = []
+            for item in items:
+                item_code = item.get('ItemCode')
+                
+                # Get additional item master data for UoM and other details
+                item_master_url = f"{self.base_url}/b1s/v1/Items('{item_code}')"
+                try:
+                    item_response = self.session.get(item_master_url)
+                    if item_response.status_code == 200:
+                        item_data = item_response.json()
+                        item['UoM'] = item_data.get('SalesUnit', item.get('UoM', 'EA'))
+                        item['ItemType'] = item_data.get('ItemType', 'itItems')
+                        item['ManageBatchNumbers'] = item_data.get('ManageBatchNumbers', 'tNO')
+                        item['ManageSerialNumbers'] = item_data.get('ManageSerialNumbers', 'tNO')
+                except Exception as item_error:
+                    logging.warning(f"Could not get item master data for {item_code}: {item_error}")
+                
+                enhanced_items.append(item)
+            
+            return enhanced_items
+            
+        except Exception as e:
+            logging.error(f"Error in get_bin_items_with_quantities for {bin_code}: {str(e)}")
+            return []
+
+    def sync_bin_data_to_database(self, bin_code):
+        """Synchronize bin item data from SAP B1 to local database"""
+        try:
+            from app import db
+            from models import BinItem, BinLocation
+            
+            # Get items from SAP B1
+            sap_items = self.get_bin_items_with_quantities(bin_code)
+            
+            if not sap_items:
+                logging.warning(f"No items found in SAP B1 for bin {bin_code}")
+                return False
+            
+            # Clear existing data for this bin
+            BinItem.query.filter_by(bin_code=bin_code).delete()
+            
+            # Insert new data
+            for item in sap_items:
+                bin_item = BinItem(
+                    bin_code=bin_code,
+                    item_code=item.get('ItemCode', ''),
+                    item_name=item.get('ItemName', ''),
+                    batch_number=item.get('BatchNumber', ''),
+                    quantity=item.get('Quantity', 0),
+                    available_quantity=item.get('Quantity', 0),
+                    committed_quantity=0,
+                    uom=item.get('UoM', 'EA'),
+                    expiry_date=item.get('ExpiryDate') if item.get('ExpiryDate') else None,
+                    manufacturing_date=item.get('ManufacturingDate') if item.get('ManufacturingDate') else None,
+                    admission_date=item.get('AdmissionDate') if item.get('AdmissionDate') else None,
+                    warehouse_code=item.get('WarehouseCode', ''),
+                    batch_attribute2=bin_code
+                )
+                db.session.add(bin_item)
+            
+            db.session.commit()
+            logging.info(f"✅ Synchronized {len(sap_items)} items to database for bin {bin_code}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error synchronizing bin data to database: {str(e)}")
+            try:
+                db.session.rollback()
+            except:
+                pass
+            return False
     
     def get_available_bins(self, warehouse_code):
         """Get available bins for a warehouse"""

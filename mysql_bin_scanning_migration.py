@@ -53,7 +53,7 @@ def create_bin_scanning_tables(connection):
         """)
         logging.info("✅ Created bin_locations table")
         
-        # Create bin_items table for tracking items in bins with SAP B1 integration
+        # Create bin_items table for real-time SAP B1 bin scanning integration
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS bin_items (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -62,19 +62,29 @@ def create_bin_scanning_tables(connection):
                 item_name VARCHAR(255),
                 batch_number VARCHAR(100),
                 quantity DECIMAL(10,3) NOT NULL DEFAULT 0,
+                available_quantity DECIMAL(10,3) NOT NULL DEFAULT 0,
+                committed_quantity DECIMAL(10,3) NOT NULL DEFAULT 0,
                 uom VARCHAR(20) DEFAULT 'EA',
                 expiry_date DATE,
                 manufacturing_date DATE,
+                admission_date DATE,
                 warehouse_code VARCHAR(50),
                 sap_abs_entry INT,
                 sap_system_number INT,
+                sap_doc_entry INT,
+                batch_attribute1 VARCHAR(100),
+                batch_attribute2 VARCHAR(100),
+                batch_status VARCHAR(50) DEFAULT 'bdsStatus_Released',
+                last_sap_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_bin_item (bin_code, item_code),
                 INDEX idx_item_code (item_code),
                 INDEX idx_batch_number (batch_number),
                 INDEX idx_warehouse_code (warehouse_code),
-                FOREIGN KEY (bin_code) REFERENCES bin_locations(bin_code) ON DELETE CASCADE
+                INDEX idx_batch_attribute2 (batch_attribute2),
+                INDEX idx_sap_sync (last_sap_sync),
+                UNIQUE KEY unique_bin_item_batch (bin_code, item_code, batch_number)
             ) ENGINE=InnoDB
         """)
         logging.info("✅ Created bin_items table")
@@ -156,17 +166,18 @@ def add_missing_columns(cursor):
         logging.error(f"❌ Error adding missing columns: {e}")
 
 def insert_sample_bin_data(connection):
-    """Insert sample bin location data for testing"""
+    """Insert sample bin location data based on your SAP B1 examples"""
     cursor = connection.cursor()
     
     try:
+        # Real bin codes from your SAP B1 data
         sample_bins = [
             ('7000-FG-SYSTEM-BIN-LOCATION', '7000-FG', 'System bin location for finished goods', True, True),
+            ('7000-FG-C411', '7000-FG', 'Finished goods bin C411', True, False),
+            ('7000-FG-C511', '7000-FG', 'Finished goods bin C511', True, False),
+            ('7000-FG-C810', '7000-FG', 'Finished goods bin C810', True, False),
             ('WH001-BIN-01', 'WH001', 'Main warehouse bin 01', True, False),
             ('WH001-BIN-02', 'WH001', 'Main warehouse bin 02', True, False),
-            ('WH002-BIN-01', 'WH002', 'Secondary warehouse bin 01', True, False),
-            ('7000-FG-BIN-A1', '7000-FG', 'Finished goods storage A1', True, False),
-            ('7000-FG-BIN-A2', '7000-FG', 'Finished goods storage A2', True, False),
         ]
         
         for bin_code, warehouse_code, description, is_active, is_system_bin in sample_bins:
@@ -176,7 +187,23 @@ def insert_sample_bin_data(connection):
                 VALUES (%s, %s, %s, %s, %s)
             """, (bin_code, warehouse_code, description, is_active, is_system_bin))
         
-        logging.info("✅ Sample bin location data inserted")
+        # Insert sample bin items based on your BatchNumberDetails data
+        sample_items = [
+            ('7000-FG-C411', '1248-109226', 'Araymond-9.00 x 2.00-7SF2081', '483108857', 25.0, 'EA'),
+            ('7000-FG-C511', '1248-109234', 'Araymond-9.60 x 2.50-7SF2081', '483125004', 18.0, 'EA'),
+            ('7000-FG-C810', '1248-109242', 'Araymond-9.60 x 2.00-6DF1882', '483229468', 22.0, 'EA'),
+            ('7000-FG-SYSTEM-BIN-LOCATION', 'CO0726Y', 'COATED LOWER PLATE', '20220729', 12.0, 'EA'),
+            ('7000-FG-SYSTEM-BIN-LOCATION', 'CO0098Y', 'Big Aluminium Insert Coated RR AC0101', '20220729', 8.5, 'EA'),
+        ]
+        
+        for bin_code, item_code, item_name, batch_number, quantity, uom in sample_items:
+            cursor.execute("""
+                INSERT IGNORE INTO bin_items 
+                (bin_code, item_code, item_name, batch_number, quantity, available_quantity, uom, warehouse_code, batch_attribute2) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (bin_code, item_code, item_name, batch_number, quantity, quantity, uom, '7000-FG', bin_code))
+        
+        logging.info("✅ Sample bin location and item data inserted")
         connection.commit()
         
     except mysql.connector.Error as e:

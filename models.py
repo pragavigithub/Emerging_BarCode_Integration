@@ -109,6 +109,7 @@ class User(UserMixin, db.Model):
                               back_populates='user',
                               foreign_keys='PickList.user_id')
     inventory_counts = relationship('InventoryCount', back_populates='user')
+    bin_scanning_logs = relationship('BinScanningLog', back_populates='user')
 
 
 class GRPODocument(db.Model):
@@ -323,3 +324,77 @@ class BarcodeLabel(db.Model):
     print_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_printed = db.Column(db.DateTime, nullable=True)
+
+    def __repr__(self):
+        return f'<BarcodeLabel {self.id}>'
+
+
+class BinLocation(db.Model):
+    __tablename__ = 'bin_locations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    bin_code = db.Column(db.String(100), unique=True, nullable=False)
+    warehouse_code = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.String(255), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    is_system_bin = db.Column(db.Boolean, default=False)
+    sap_abs_entry = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    bin_items = relationship('BinItem', back_populates='bin_location')
+    
+    def __repr__(self):
+        return f'<BinLocation {self.bin_code}>'
+
+
+class BinItem(db.Model):
+    __tablename__ = 'bin_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    bin_code = db.Column(db.String(100), db.ForeignKey('bin_locations.bin_code'), nullable=False)
+    item_code = db.Column(db.String(100), nullable=False)
+    item_name = db.Column(db.String(255), nullable=True)
+    batch_number = db.Column(db.String(100), nullable=True)
+    quantity = db.Column(db.Float, default=0)
+    available_quantity = db.Column(db.Float, default=0)
+    committed_quantity = db.Column(db.Float, default=0)
+    uom = db.Column(db.String(20), default='EA')
+    expiry_date = db.Column(db.Date, nullable=True)
+    manufacturing_date = db.Column(db.Date, nullable=True)
+    admission_date = db.Column(db.Date, nullable=True)
+    warehouse_code = db.Column(db.String(50), nullable=True)
+    sap_abs_entry = db.Column(db.Integer, nullable=True)
+    sap_system_number = db.Column(db.Integer, nullable=True)
+    sap_doc_entry = db.Column(db.Integer, nullable=True)
+    batch_attribute1 = db.Column(db.String(100), nullable=True)
+    batch_attribute2 = db.Column(db.String(100), nullable=True)
+    batch_status = db.Column(db.String(50), default='bdsStatus_Released')
+    last_sap_sync = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    bin_location = relationship('BinLocation', back_populates='bin_items')
+    
+    def __repr__(self):
+        return f'<BinItem {self.item_code} in {self.bin_code}>'
+
+
+class BinScanningLog(db.Model):
+    __tablename__ = 'bin_scanning_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    bin_code = db.Column(db.String(100), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    scan_type = db.Column(db.String(50), nullable=False)  # BIN_SCAN, ITEM_SCAN, etc.
+    scan_data = db.Column(db.Text, nullable=True)
+    items_found = db.Column(db.Integer, default=0)
+    scan_timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship('User', back_populates='bin_scanning_logs')
+    
+    def __repr__(self):
+        return f'<BinScanningLog {self.bin_code} by {self.user_id}>'
