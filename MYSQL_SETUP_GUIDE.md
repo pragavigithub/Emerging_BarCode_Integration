@@ -1,73 +1,67 @@
-# 🚨 COMPLETE MySQL Database Setup Guide
+# MySQL Setup Guide for WMS System
 
-## Current Issues Found:
-Your MySQL database has incomplete schema with these missing columns:
+## Quick Setup
 
-### ❌ GRPO Module Errors:
-- `grpo_documents.po_date` (DATETIME)
-- `grpo_documents.po_total` (DECIMAL)
-- `grpo_documents.qc_notes` (TEXT)
-- `grpo_items.unit_price` (DECIMAL)
-
-### ❌ Inventory Transfer Module Errors:
-- `inventory_transfers.transfer_request_number` (VARCHAR)
-- `inventory_transfers.from_warehouse` (VARCHAR)
-- `inventory_transfers.to_warehouse` (VARCHAR)
-
-## ✅ COMPLETE FIX (Run This):
+Run the single migration script to set up everything:
 
 ```bash
-python quick_mysql_fix.py
+python mysql_complete_migration.py
 ```
 
 This script will:
-1. Connect to your MySQL database (localhost:3306)
-2. Drop and recreate ALL tables with correct schema
-3. Insert default branch and admin user
-4. Fix all missing columns automatically
+1. Create a `.env` file with MySQL configuration
+2. Create the MySQL database
+3. Create all required tables with complete schema
+4. Set up default admin user and branch
 
-## Manual SQL Fix Alternative:
+## What You Need
 
-If the script fails, run this in MySQL Workbench:
+- MySQL Server installed and running
+- Python with mysql-connector-python package
 
-```sql
-USE wms_db_dev;
+## Default Credentials
 
--- Add missing columns to existing tables
-ALTER TABLE grpo_documents ADD COLUMN IF NOT EXISTS po_date DATETIME;
-ALTER TABLE grpo_documents ADD COLUMN IF NOT EXISTS po_total DECIMAL(15,2);
-ALTER TABLE grpo_documents ADD COLUMN IF NOT EXISTS qc_notes TEXT;
+After setup, you can login with:
+- **Username:** admin
+- **Password:** admin123
 
-ALTER TABLE grpo_items ADD COLUMN IF NOT EXISTS unit_price DECIMAL(15,2);
+## Tables Created
 
-ALTER TABLE inventory_transfers ADD COLUMN IF NOT EXISTS transfer_request_number VARCHAR(50);
-ALTER TABLE inventory_transfers ADD COLUMN IF NOT EXISTS from_warehouse VARCHAR(20);
-ALTER TABLE inventory_transfers ADD COLUMN IF NOT EXISTS to_warehouse VARCHAR(20);
-```
+The migration creates these tables:
+- `users` - User accounts and permissions
+- `grpo_documents` - Goods Receipt PO documents
+- `grpo_items` - Individual items in GRPO
+- `inventory_transfers` - Inventory transfer requests
+- `inventory_transfer_items` - Items in transfers
+- `pick_lists` - Pick list documents
+- `pick_list_items` - Items to pick
+- `inventory_counts` - Inventory counting tasks
+- `inventory_count_items` - Counted items
+- `barcode_labels` - Generated barcode labels
+- `bin_locations` - Warehouse bin locations
+- `bin_items` - Items stored in bins
+- `bin_scanning_logs` - Bin scanning activity logs
+- `branches` - Branch/location information
 
-## Environment Setup:
+## Database Configuration
 
-1. **Enable MySQL in .env**:
-   ```env
-   MYSQL_HOST=localhost
-   MYSQL_USER=root
-   MYSQL_PASSWORD=root@123
-   MYSQL_DATABASE=wms_db_dev
-   ```
+The script creates a `.env` file with these settings:
+- MySQL connection details
+- SAP B1 integration settings (optional)
+- Session configuration
+- Flask application settings
 
-2. **Test Connection**:
-   ```bash
-   python main.py
-   ```
+## Troubleshooting
 
-## Expected Results:
-✅ GRPO creation will work without "Unknown column" errors
-✅ Inventory Transfer listing will load properly
-✅ Add Item buttons will function correctly
-✅ All database operations will work seamlessly
+If you encounter issues:
+1. Make sure MySQL server is running
+2. Verify your MySQL credentials
+3. Check that the database user has CREATE privileges
+4. Ensure mysql-connector-python is installed: `pip install mysql-connector-python`
 
-## Login After Fix:
-- Username: `admin`
-- Password: `admin123`
+## Next Steps
 
-Your WMS application will work perfectly with MySQL after running this fix!
+1. Start the Flask application: `python main.py`
+2. Open http://localhost:5000 in your browser
+3. Login with admin/admin123
+4. Configure SAP B1 settings if needed

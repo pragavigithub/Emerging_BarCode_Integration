@@ -140,6 +140,15 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 29, 2025. Single MySQL Migration File Created + Cleanup Complete - COMPLETED:
+  - Created comprehensive single MySQL migration file (mysql_complete_migration.py) as requested
+  - Includes complete .env file creation with MySQL, PostgreSQL, and SAP B1 configuration
+  - Contains all table schemas with proper field definitions and relationships
+  - Includes default admin user (admin/admin123) and branch setup
+  - Removed all duplicate migration files and cleanup scripts as requested
+  - Created MYSQL_SETUP_GUIDE.md with step-by-step instructions
+  - Fixed bin scanning logging import issues in routes.py
+  - Application running successfully on Replit with PostgreSQL and MySQL support maintained
 - July 28, 2025. Replit Migration + Enhanced Bin Scanning with SAP API Integration - COMPLETED:
   - Successfully completed migration from Replit Agent to Replit environment with PostgreSQL database
   - Restored MySQL configuration support for local development as requested by user
