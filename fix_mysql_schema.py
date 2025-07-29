@@ -170,6 +170,26 @@ def fix_mysql_schema():
             except Error as e:
                 print(f"⚠️ Error creating default branch: {e}")
             
+            print("📝 Adding missing columns to grpo_documents table...")
+            
+            # Add missing columns to grpo_documents table
+            missing_grpo_columns = [
+                "ADD COLUMN sap_document_number VARCHAR(50)",
+                "ADD COLUMN qc_user_id INT",
+                "ADD COLUMN qc_notes TEXT",
+                "ADD COLUMN draft_or_post VARCHAR(20) DEFAULT 'draft'"
+            ]
+            
+            for column_sql in missing_grpo_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE grpo_documents {column_sql}")
+                    print(f"✅ Added GRPO column: {column_sql}")
+                except Error as e:
+                    if "Duplicate column name" in str(e):
+                        print(f"✓ GRPO column already exists: {column_sql}")
+                    else:
+                        print(f"⚠️ Error adding GRPO column {column_sql}: {e}")
+            
             connection.commit()
             cursor.close()
             connection.close()

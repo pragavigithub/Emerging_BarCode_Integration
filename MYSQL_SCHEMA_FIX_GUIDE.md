@@ -75,6 +75,12 @@ WHERE username = 'admin';
 -- Ensure default branch exists
 INSERT IGNORE INTO branches (id, name, description, is_active)
 VALUES ('HQ001', 'Head Office', 'Main headquarters branch', TRUE);
+
+-- Add missing columns to grpo_documents table
+ALTER TABLE grpo_documents ADD COLUMN sap_document_number VARCHAR(50);
+ALTER TABLE grpo_documents ADD COLUMN qc_user_id INT;
+ALTER TABLE grpo_documents ADD COLUMN qc_notes TEXT;
+ALTER TABLE grpo_documents ADD COLUMN draft_or_post VARCHAR(20) DEFAULT 'draft';
 ```
 
 ### Method 3: Complete Database Rebuild
