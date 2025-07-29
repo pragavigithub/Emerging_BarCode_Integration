@@ -170,11 +170,19 @@ def get_bin_items_enhanced(self, bin_code):
 # Apply this fix to the existing SAPIntegration class
 def apply_bin_scanning_fix():
     """Apply the enhanced bin scanning fix to existing SAP integration"""
-    import sap_integration
-    
-    # Replace the get_bin_items method with the enhanced version
-    sap_integration.SAPIntegration.get_bin_items = get_bin_items_enhanced
-    print("✅ Applied enhanced bin scanning fix to SAP integration")
+    try:
+        # Import sap_integration dynamically to avoid circular imports
+        import sys
+        if 'sap_integration' in sys.modules:
+            sap_integration = sys.modules['sap_integration']
+        else:
+            import sap_integration
+        
+        # Replace the get_bin_items method with the enhanced version
+        sap_integration.SAPIntegration.get_bin_items = get_bin_items_enhanced
+        print("✅ Applied enhanced bin scanning fix to SAP integration")
+    except Exception as e:
+        print(f"⚠️ Could not apply bin scanning fix: {e}")
 
 
 if __name__ == "__main__":

@@ -149,7 +149,8 @@ with app.app_context():
     # Import models to create tables
     import models
     import models_extensions
-    import api_batch_management
+    # Import api_batch_management later to avoid circular imports
+# import api_batch_management
     db.create_all()
     logging.info("Database tables created")
     

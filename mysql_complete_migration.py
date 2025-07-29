@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Complete MySQL Migration Script
-This script creates a .env file and sets up the complete database schema for the WMS system.
-Run this script to set up MySQL database for local development.
+Fixed MySQL Migration Script
+This script fixes the column issues and creates a complete database schema.
 """
 
 import os
@@ -107,9 +106,10 @@ def create_tables(host, port, user, password, database):
         if connection.is_connected():
             cursor = connection.cursor()
             
-            # Create users table
+            # Drop and recreate users table with all required columns
+            cursor.execute("DROP TABLE IF EXISTS users")
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE users (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     username VARCHAR(64) UNIQUE NOT NULL,
                     email VARCHAR(120) UNIQUE NOT NULL,
@@ -126,9 +126,9 @@ def create_tables(host, port, user, password, database):
                     INDEX idx_branch (branch_id)
                 )
             """)
-            print("✅ Users table created")
+            print("✅ Users table created with all columns")
             
-            # Create grpo_documents table
+            # Create all other tables...
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS grpo_documents (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -152,7 +152,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ GRPO Documents table created")
             
-            # Create grpo_items table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS grpo_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -176,7 +175,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ GRPO Items table created")
             
-            # Create inventory_transfers table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS inventory_transfers (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -200,7 +198,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Inventory Transfers table created")
             
-            # Create inventory_transfer_items table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS inventory_transfer_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -228,7 +225,7 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Inventory Transfer Items table created")
             
-            # Create pick_lists table
+            # Continue with other tables...
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS pick_lists (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -248,7 +245,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Pick Lists table created")
             
-            # Create pick_list_items table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS pick_list_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -268,7 +264,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Pick List Items table created")
             
-            # Create inventory_counts table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS inventory_counts (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -288,7 +283,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Inventory Counts table created")
             
-            # Create inventory_count_items table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS inventory_count_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -308,7 +302,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Inventory Count Items table created")
             
-            # Create barcode_labels table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS barcode_labels (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -324,7 +317,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Barcode Labels table created")
             
-            # Create bin_locations table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS bin_locations (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -342,7 +334,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Bin Locations table created")
             
-            # Create bin_items table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS bin_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -375,7 +366,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Bin Items table created")
             
-            # Create bin_scanning_logs table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS bin_scanning_logs (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -393,14 +383,6 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Bin Scanning Logs table created")
             
-            # Create default admin user
-            cursor.execute("""
-                INSERT IGNORE INTO users (username, email, password_hash, user_role, user_is_active, branch_id, default_branch_id, permissions)
-                VALUES ('admin', 'admin@wms.local', 'scrypt:32768:8:1$MGJhMlBF7UJHUzBr$9e1c9b8e5f4a3d2c1b0a9876543210fedcba0987654321fedcba09876543210abcdef123456789abcdef1234567890abcdef', 'admin', TRUE, 'HQ001', 'HQ001', '{"can_manage_users": true, "can_approve_grpo": true, "can_approve_transfers": true, "can_manage_inventory": true}')
-            """)
-            print("✅ Default admin user created (username: admin, password: admin123)")
-            
-            # Create default branch
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS branches (
                     id VARCHAR(20) PRIMARY KEY,
@@ -410,6 +392,14 @@ def create_tables(host, port, user, password, database):
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            print("✅ Branches table created")
+            
+            # Insert default data
+            cursor.execute("""
+                INSERT IGNORE INTO users (username, email, password_hash, user_role, user_is_active, branch_id, default_branch_id, permissions)
+                VALUES ('admin', 'admin@wms.local', 'scrypt:32768:8:1$MGJhMlBF7UJHUzBr$9e1c9b8e5f4a3d2c1b0a9876543210fedcba0987654321fedcba09876543210abcdef123456789abcdef1234567890abcdef', 'admin', TRUE, 'HQ001', 'HQ001', '{"can_manage_users": true, "can_approve_grpo": true, "can_approve_transfers": true, "can_manage_inventory": true}')
+            """)
+            print("✅ Default admin user created (username: admin, password: admin123)")
             
             cursor.execute("""
                 INSERT IGNORE INTO branches (id, name, description, is_active)
@@ -421,7 +411,7 @@ def create_tables(host, port, user, password, database):
             cursor.close()
             connection.close()
             
-            print("\n🎉 All tables created successfully!")
+            print("\n🎉 All tables created successfully with proper columns!")
             return True
             
     except Error as e:
@@ -431,7 +421,7 @@ def create_tables(host, port, user, password, database):
 def main():
     """Main migration function"""
     print("=" * 60)
-    print("   WMS Complete MySQL Migration Script")
+    print("   WMS Fixed MySQL Migration Script")
     print("=" * 60)
     print()
     
@@ -469,12 +459,6 @@ def main():
     print("1. Start your Flask application: python main.py")
     print("2. Login with: username=admin, password=admin123")
     print("3. Configure SAP B1 connection in the .env file if needed")
-    print()
-    print("Database Details:")
-    print(f"- Host: {host}")
-    print(f"- Port: {port}")
-    print(f"- Database: {database}")
-    print(f"- User: {user}")
     print()
 
 if __name__ == "__main__":

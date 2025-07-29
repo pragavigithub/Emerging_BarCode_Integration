@@ -7,7 +7,8 @@ API endpoints for managing batch numbers and stock levels
 
 from flask import jsonify, request
 from app import app
-from sap_integration import SAPIntegration
+# Import SAPIntegration dynamically to avoid circular imports
+# from sap_integration import SAPIntegration
 import logging
 
 @app.route('/api/get_available_batches/<item_code>')
@@ -16,6 +17,8 @@ def get_available_batches(item_code):
     try:
         from_warehouse = request.args.get('from_warehouse', '')
         
+        # Import SAPIntegration dynamically to avoid circular imports
+        from sap_integration import SAPIntegration
         sap = SAPIntegration()
         
         # Get batch details from SAP B1
@@ -59,6 +62,8 @@ def get_batch_stock(item_code, batch_number):
     try:
         warehouse = request.args.get('warehouse', '')
         
+        # Import SAPIntegration dynamically to avoid circular imports
+        from sap_integration import SAPIntegration
         sap = SAPIntegration()
         
         # Get specific batch stock from SAP B1
@@ -96,6 +101,8 @@ def validate_batch_quantity():
         warehouse = request.args.get('warehouse', '')
         requested_qty = float(request.args.get('quantity', 0))
         
+        # Import SAPIntegration dynamically to avoid circular imports
+        from sap_integration import SAPIntegration
         sap = SAPIntegration()
         
         # Get batch stock
