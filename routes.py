@@ -6,7 +6,7 @@ import logging
 import json
 
 from app import app, db, login_manager
-from models import User, GRPODocument, GRPOItem, InventoryTransfer, InventoryTransferItem, PickList, PickListItem, InventoryCount, InventoryCountItem, BarcodeLabel, BinScanningLog
+from models import User, GRPODocument, GRPOItem, InventoryTransfer, InventoryTransferItem, PickList, PickListItem, InventoryCount, InventoryCountItem, BarcodeLabel, BinScanningLog, DocumentNumberSeries
 from sap_integration import SAPIntegration
 
 # BinScanningLog is now imported above
@@ -180,9 +180,13 @@ def create_grpo():
             logging.warning(f"Could not parse PO date '{date_str}': {e}")
             po_date = datetime.utcnow()
 
-    # Create GRPO document with PO details
+    # Generate GRPO document number using document series
+    grpo_number = DocumentNumberSeries.get_next_number('GRPO')
+    
+    # Create GRPO document with PO details and generated document number
     grpo_doc = GRPODocument(
         po_number=po_number,
+        sap_document_number=grpo_number,  # Use generated GRPO number
         supplier_code=po_data.get('CardCode'),
         supplier_name=po_data.get('CardName'),
         po_date=po_date,
@@ -321,6 +325,29 @@ def add_grpo_item(grpo_id):
         if po_item.get('ItemCode') == item_code:
             po_line_item = po_item
             break
+    
+    # ENHANCED VALIDATION: Check quantity restrictions as requested by user
+    if po_line_item:
+        po_quantity = po_line_item.get('Quantity', 0)
+        open_quantity = po_line_item.get('OpenQuantity', po_quantity)
+        
+        # Get already received quantity for this item in this GRPO and other GRPOs
+        existing_received = db.session.query(db.func.sum(GRPOItem.received_quantity)).filter(
+            GRPOItem.item_code == item_code,
+            GRPOItem.grpo_document_id == grpo_doc.id
+        ).scalar() or 0
+        
+        # VALIDATION 1: Cannot exceed PO order quantity
+        if (existing_received + quantity) > po_quantity:
+            flash(f'Error: Total received quantity ({existing_received + quantity}) cannot exceed PO order quantity ({po_quantity}) for item {item_code}', 'error')
+            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        
+        # VALIDATION 2: Cannot exceed open quantity (available to receive)
+        if quantity > open_quantity:
+            flash(f'Error: Received quantity ({quantity}) cannot exceed open quantity ({open_quantity}) for item {item_code}', 'error')
+            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        
+        logging.info(f"✅ Quantity validation passed for {item_code}: Received={quantity}, Open={open_quantity}, PO Total={po_quantity}")
     
     # Generate barcode if not provided
     generated_barcode = None

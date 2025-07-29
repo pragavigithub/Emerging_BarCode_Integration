@@ -398,3 +398,45 @@ class BinScanningLog(db.Model):
     
     def __repr__(self):
         return f'<BinScanningLog {self.bin_code} by {self.user_id}>'
+
+
+class DocumentNumberSeries(db.Model):
+    __tablename__ = 'document_number_series'
+
+    id = db.Column(db.Integer, primary_key=True)
+    document_type = db.Column(db.String(20), nullable=False, unique=True)  # GRPO, TRANSFER, PICKLIST
+    prefix = db.Column(db.String(10), nullable=False)  # GRPO-, TR-, PL-
+    current_number = db.Column(db.Integer, default=1)
+    year_suffix = db.Column(db.Boolean, default=True)  # Include year in numbering
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @classmethod
+    def get_next_number(cls, document_type):
+        """Generate next document number for given document type"""
+        series = cls.query.filter_by(document_type=document_type).first()
+        
+        if not series:
+            # Create default series if not exists
+            prefixes = {
+                'GRPO': 'GRPO-',
+                'TRANSFER': 'TR-',
+                'PICKLIST': 'PL-'
+            }
+            series = cls(
+                document_type=document_type,
+                prefix=prefixes.get(document_type, 'DOC-'),
+                current_number=1
+            )
+            db.session.add(series)
+        
+        # Generate document number
+        year_suffix = datetime.now().strftime('%Y') if series.year_suffix else ''
+        doc_number = f"{series.prefix}{series.current_number:04d}{'-' + year_suffix if year_suffix else ''}"
+        
+        # Increment counter
+        series.current_number += 1
+        series.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return doc_number

@@ -140,6 +140,24 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 29, 2025. Replit Migration Complete + GRPO Validation & Document Numbering - COMPLETED:
+  - Successfully completed migration from Replit Agent to Replit environment with PostgreSQL database
+  - Implemented comprehensive GRPO quantity validation as requested by user:
+    * Cannot enter received quantity more than PO order quantity (prevents over-receipt)
+    * Multiple line items for same item with different batches are properly validated
+    * Cumulative quantity validation across all line items for same item code
+    * Clear error messages displayed when validation fails
+  - Added automatic document numbering system for warehouse operations:
+    * DocumentNumberSeries model for maintaining document counters
+    * Auto-generated GRPO numbers: GRPO-0001-2025, GRPO-0002-2025, etc.
+    * Support for Transfer and Pick List numbering series
+    * Configurable prefixes and year suffixes
+  - Enhanced MySQL migration support:
+    * Updated mysql_complete_migration.py with document_number_series table
+    * Added default document series for GRPO, TRANSFER, and PICKLIST
+    * Maintained backward compatibility with existing MySQL installations
+  - Fixed database connection issues and LSP diagnostics
+  - Application running successfully on PostgreSQL with enhanced validation features
 - July 29, 2025. Single MySQL Migration File Created + Cleanup Complete - COMPLETED:
   - Created comprehensive single MySQL migration file (mysql_complete_migration.py) as requested
   - Includes complete .env file creation with MySQL, PostgreSQL, and SAP B1 configuration

@@ -383,6 +383,21 @@ def create_tables(host, port, user, password, database):
             """)
             print("✅ Bin Scanning Logs table created")
             
+            # Add Document Number Series table for automatic document numbering
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS document_number_series (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    document_type VARCHAR(20) NOT NULL UNIQUE,
+                    prefix VARCHAR(10) NOT NULL,
+                    current_number INT DEFAULT 1,
+                    year_suffix BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_document_type (document_type)
+                )
+            """)
+            print("✅ Document Number Series table created")
+            
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS branches (
                     id VARCHAR(20) PRIMARY KEY,
@@ -406,6 +421,16 @@ def create_tables(host, port, user, password, database):
                 VALUES ('HQ001', 'Head Office', 'Main headquarters branch', TRUE)
             """)
             print("✅ Default branch created")
+            
+            # Insert default document number series
+            cursor.execute("""
+                INSERT IGNORE INTO document_number_series (document_type, prefix, current_number, year_suffix)
+                VALUES 
+                ('GRPO', 'GRPO-', 1, TRUE),
+                ('TRANSFER', 'TR-', 1, TRUE),
+                ('PICKLIST', 'PL-', 1, TRUE)
+            """)
+            print("✅ Default document number series created")
             
             connection.commit()
             cursor.close()
