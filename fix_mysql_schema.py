@@ -123,34 +123,42 @@ def fix_mysql_schema():
             except Error as e:
                 print(f"⚠️ Error creating document_number_series table: {e}")
             
-            print("📝 Updating existing admin user...")
+            print("📝 Creating/updating admin user with proper credentials...")
             
-            # Update existing admin user with proper values
-            try:
-                cursor.execute("""
-                    UPDATE users SET 
-                        first_name = COALESCE(first_name, 'Admin'),
-                        last_name = COALESCE(last_name, 'User'),
-                        branch_name = COALESCE(branch_name, 'Head Office'),
-                        role = COALESCE(role, 'admin')
-                    WHERE username = 'admin'
-                """)
-                print("✅ Admin user updated with proper values")
-            except Error as e:
-                print(f"⚠️ Error updating admin user: {e}")
-                # Try with user_role if role doesn't exist yet
+            # Generate proper password hash for 'admin123'
+            from werkzeug.security import generate_password_hash
+            password_hash = generate_password_hash('admin123')
+            
+            # First check if admin exists
+            cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+            admin_exists = cursor.fetchone()
+            
+            if admin_exists:
+                # Update existing admin user
                 try:
                     cursor.execute("""
                         UPDATE users SET 
-                            first_name = COALESCE(first_name, 'Admin'),
-                            last_name = COALESCE(last_name, 'User'),
-                            branch_name = COALESCE(branch_name, 'Head Office'),
-                            user_role = COALESCE(user_role, 'admin')
+                            password_hash = %s,
+                            first_name = 'Admin',
+                            last_name = 'User',
+                            branch_name = 'Head Office',
+                            role = 'admin',
+                            user_is_active = 1
                         WHERE username = 'admin'
-                    """)
-                    print("✅ Admin user updated with user_role column")
-                except Error as e2:
-                    print(f"⚠️ Error updating admin user with user_role: {e2}")
+                    """, (password_hash,))
+                    print("✅ Admin user updated with new password hash")
+                except Error as e:
+                    print(f"⚠️ Error updating admin user: {e}")
+            else:
+                # Create new admin user
+                try:
+                    cursor.execute("""
+                        INSERT INTO users (username, email, password_hash, role, user_is_active, first_name, last_name, branch_name)
+                        VALUES ('admin', 'admin@wms.local', %s, 'admin', 1, 'Admin', 'User', 'Head Office')
+                    """, (password_hash,))
+                    print("✅ New admin user created with proper credentials")
+                except Error as e:
+                    print(f"⚠️ Error creating admin user: {e}")
             
             # Ensure default branch exists
             try:
