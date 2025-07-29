@@ -7,14 +7,17 @@ class Branch(db.Model):
     
     id = db.Column(db.String(10), primary_key=True)  # Branch code like 'BR001'
     name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)  # Match MySQL schema field name
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Make these fields optional and only include them if they exist in the schema
     address = db.Column(db.Text, nullable=True)
     phone = db.Column(db.String(20), nullable=True)
     email = db.Column(db.String(100), nullable=True)
     manager_name = db.Column(db.String(100), nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
-    is_default = db.Column(db.Boolean, default=False)  # Default branch for new users
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_default = db.Column(db.Boolean, default=False, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 class UserSession(db.Model):
     """Track user login sessions"""

@@ -114,13 +114,18 @@ def create_tables(host, port, user, password, database):
                     username VARCHAR(64) UNIQUE NOT NULL,
                     email VARCHAR(120) UNIQUE NOT NULL,
                     password_hash VARCHAR(256),
+                    first_name VARCHAR(80),
+                    last_name VARCHAR(80),
                     user_role ENUM('admin', 'manager', 'user', 'qc') DEFAULT 'user',
-                    user_is_active BOOLEAN DEFAULT TRUE,
                     branch_id VARCHAR(20),
+                    branch_name VARCHAR(100),
                     default_branch_id VARCHAR(20),
+                    user_is_active BOOLEAN DEFAULT TRUE,
+                    must_change_password BOOLEAN DEFAULT FALSE,
+                    last_login TIMESTAMP NULL,
                     permissions TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    last_login TIMESTAMP NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_username (username),
                     INDEX idx_email (email),
                     INDEX idx_branch (branch_id)
@@ -403,8 +408,14 @@ def create_tables(host, port, user, password, database):
                     id VARCHAR(20) PRIMARY KEY,
                     name VARCHAR(100) NOT NULL,
                     description TEXT,
+                    address TEXT,
+                    phone VARCHAR(20),
+                    email VARCHAR(100),
+                    manager_name VARCHAR(100),
                     is_active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    is_default BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
             """)
             print("✅ Branches table created")
