@@ -44,6 +44,21 @@ def fix_mysql_schema():
                 "ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
             ]
             
+            # Check if we need to rename user_role to role
+            cursor.execute("SHOW COLUMNS FROM users LIKE 'role'")
+            role_exists = cursor.fetchone()
+            
+            cursor.execute("SHOW COLUMNS FROM users LIKE 'user_role'")
+            user_role_exists = cursor.fetchone()
+            
+            if user_role_exists and not role_exists:
+                print("🔄 Renaming user_role column to role...")
+                cursor.execute("ALTER TABLE users CHANGE COLUMN user_role role VARCHAR(20) DEFAULT 'user'")
+                print("✅ Renamed user_role to role")
+            elif not role_exists and not user_role_exists:
+                missing_user_columns.append("ADD COLUMN role VARCHAR(20) DEFAULT 'user'")
+                print("➕ Will add role column")
+            
             for column_sql in missing_user_columns:
                 try:
                     cursor.execute(f"ALTER TABLE users {column_sql}")
@@ -116,12 +131,26 @@ def fix_mysql_schema():
                     UPDATE users SET 
                         first_name = COALESCE(first_name, 'Admin'),
                         last_name = COALESCE(last_name, 'User'),
-                        branch_name = COALESCE(branch_name, 'Head Office')
+                        branch_name = COALESCE(branch_name, 'Head Office'),
+                        role = COALESCE(role, 'admin')
                     WHERE username = 'admin'
                 """)
                 print("✅ Admin user updated with proper values")
             except Error as e:
                 print(f"⚠️ Error updating admin user: {e}")
+                # Try with user_role if role doesn't exist yet
+                try:
+                    cursor.execute("""
+                        UPDATE users SET 
+                            first_name = COALESCE(first_name, 'Admin'),
+                            last_name = COALESCE(last_name, 'User'),
+                            branch_name = COALESCE(branch_name, 'Head Office'),
+                            user_role = COALESCE(user_role, 'admin')
+                        WHERE username = 'admin'
+                    """)
+                    print("✅ Admin user updated with user_role column")
+                except Error as e2:
+                    print(f"⚠️ Error updating admin user with user_role: {e2}")
             
             # Ensure default branch exists
             try:

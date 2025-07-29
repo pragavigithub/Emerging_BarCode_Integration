@@ -33,6 +33,9 @@ ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN last_login TIMESTAMP NULL;
 ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
+-- Fix the role column naming issue (rename user_role to role)
+ALTER TABLE users CHANGE COLUMN user_role role VARCHAR(20) DEFAULT 'user';
+
 -- Add missing columns to branches table  
 ALTER TABLE branches ADD COLUMN description TEXT;
 ALTER TABLE branches ADD COLUMN address TEXT;
@@ -65,7 +68,8 @@ VALUES
 UPDATE users SET 
     first_name = COALESCE(first_name, 'Admin'),
     last_name = COALESCE(last_name, 'User'),
-    branch_name = COALESCE(branch_name, 'Head Office')
+    branch_name = COALESCE(branch_name, 'Head Office'),
+    role = COALESCE(role, 'admin')
 WHERE username = 'admin';
 
 -- Ensure default branch exists
