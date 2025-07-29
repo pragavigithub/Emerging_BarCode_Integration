@@ -140,6 +140,15 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 30, 2025. MySQL Schema Fix for Local Development - COMPLETED:
+  - Fixed critical MySQL database schema issues causing login failures
+  - Created fix_mysql_schema.py script to add missing columns automatically
+  - Added missing columns: first_name, last_name, branch_name, must_change_password, last_login to users table
+  - Added missing columns: description, address, phone, email, manager_name, is_default to branches table
+  - Ensured document_number_series table exists with default GRPO, TRANSFER, PICKLIST series
+  - Updated existing admin user with proper values to prevent null constraint violations
+  - Created comprehensive MYSQL_SCHEMA_FIX_GUIDE.md with multiple fix methods
+  - Local MySQL installations now fully compatible with enhanced GRPO validation and document numbering
 - July 29, 2025. Replit Migration Complete + GRPO Validation & Document Numbering - COMPLETED:
   - Successfully completed migration from Replit Agent to Replit environment with PostgreSQL database
   - Implemented comprehensive GRPO quantity validation as requested by user:
