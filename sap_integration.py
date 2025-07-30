@@ -2036,7 +2036,7 @@ class SAPIntegration:
         if not self.ensure_logged_in():
             return []
 
-        url = f"{self.base_url}/b1s/v1/BinLocations?$filter=WhsCode eq '{warehouse_code}'"
+        url = f"{self.base_url}/b1s/v1/BinLocations?$filter=Warehouse eq '{warehouse_code}'"
 
         try:
             response = self.session.get(url)
@@ -2375,9 +2375,9 @@ class SAPIntegration:
             return mock_batches
 
         try:
-            url = f"{self.base_url}/b1s/v1/BatchNumberDetails?$filter=ItemCode eq '{item_code}' and Status eq 'bdsStatus_Released'"
+            url = f"{self.base_url}/b1s/v1/BatchNumberDetails?$filter=ItemCode eq '{item_code}'"
             logging.info(f"🔍 Fetching batch numbers from SAP B1: {url}")
-
+            print("inin"+url)
             response = self.session.get(url)
             if response.status_code == 200:
                 data = response.json()
@@ -3477,7 +3477,7 @@ class SAPIntegration:
             logging.error(f"Error getting warehouses: {str(e)}")
             return []
 
-    def get_warehouse_batches(self, warehouse_code):
+    def get_warehouse_batches(self, item_code):
         """Get all batches available in specific warehouse"""
         if not self.ensure_logged_in():
             # Return mock data for offline mode
@@ -3489,13 +3489,14 @@ class SAPIntegration:
 
         try:
             # Query BatchNumberDetails filtered by warehouse
-            url = f"{self.base_url}/b1s/v1/BatchNumberDetails"
-            params = {
-                "$filter": f"Location eq \"{warehouse_code}\"",
-                "$select": "Batch,ItemCode,ExpirationDate,Quantity"
-            }
-            
-            response = self.session.get(url, params=params)
+            url = f"{self.base_url}/b1s/v1/BatchNumberDetails?$filter = {item_code} "
+            # params = {
+            #     "$filter": f"ItemCode eq \"{item_code}\"",
+            #     "$select": "Batch,ItemCode,ExpirationDate,Quantity"
+            # }
+
+            print(url)
+            response = self.session.get(url)
             
             if response.status_code == 200:
                 data = response.json()
@@ -3506,15 +3507,15 @@ class SAPIntegration:
                     formatted_batches.append({
                         "Batch": batch.get("Batch"),
                         "ItemCode": batch.get("ItemCode"),
-                        "ExpirationDate": batch.get("ExpirationDate", ""),
-                        "Quantity": batch.get("Quantity", 0)
+                        "ExpirationDate": batch.get("ExpirationDate", "")#,
+                       # "Quantity": batch.get("Quantity", 0)
                     })
                 
                 return formatted_batches
             else:
-                logging.error(f"Failed to get batches for warehouse {warehouse_code}: {response.status_code}")
+                logging.error(f"Failed to get batches for warehouse {item_code}: {response.status_code}")
                 return []
         except Exception as e:
-            logging.error(f"Error getting batches for warehouse {warehouse_code}: {str(e)}")
+            logging.error(f"Error getting batches for warehouse {item_code}: {str(e)}")
             return []
 

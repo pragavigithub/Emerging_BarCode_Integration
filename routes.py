@@ -262,20 +262,20 @@ def get_warehouse_bins(warehouse_code):
             'bins': []
         })
 
-@app.route('/api/warehouses/<warehouse_code>/batches')
+@app.route('/api/batch-numbers/<item_code>/batches')
 @login_required
-def get_warehouse_batches(warehouse_code):
+def get_warehouse_batches(item_code):
     """Get all batches in specific warehouse"""
     try:
         sap = SAPIntegration()
-        batches = sap.get_warehouse_batches(warehouse_code)
-        
+        batches = sap.get_warehouse_batches(item_code)
+
         return jsonify({
             'success': True,
             'batches': batches
         })
     except Exception as e:
-        logging.error(f"Error fetching batches for warehouse {warehouse_code}: {str(e)}")
+        logging.error(f"Error fetching batches for warehouse {item_code}: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e),
