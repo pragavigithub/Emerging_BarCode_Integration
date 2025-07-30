@@ -30,11 +30,11 @@ login_manager = LoginManager()
 
 # Create Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-please-change-in-production")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure database with multiple database support
-# Priority: MySQL (user preference) > PostgreSQL (Replit) > SQLite (fallback)
+# Configure database for Replit environment
+# Priority: PostgreSQL (Replit) > SQLite (fallback) 
 database_url = None
 db_type = "unknown"
 
@@ -43,40 +43,6 @@ if os.environ.get("DATABASE_URL"):
     database_url = os.environ.get("DATABASE_URL")
     db_type = "postgresql"
     logging.info("✅ Using PostgreSQL database for Replit deployment")
-
-# Priority 2: MySQL (user's preferred database) - keep for local development
-if not database_url:
-    try:
-        if (os.environ.get('DATABASE_URL', '').startswith('mysql')) or (
-            os.environ.get('MYSQL_HOST') and 
-            os.environ.get('MYSQL_USER') and 
-            os.environ.get('MYSQL_PASSWORD') and 
-            os.environ.get('MYSQL_DATABASE')
-        ):
-            if os.environ.get('DATABASE_URL', '').startswith('mysql'):
-                database_url = os.environ.get('DATABASE_URL')
-                db_type = "mysql"
-                logging.info("✅ Using MySQL database from DATABASE_URL")
-            else:
-                mysql_user = os.environ.get('MYSQL_USER')
-                mysql_password = os.environ.get('MYSQL_PASSWORD')
-                mysql_host = os.environ.get('MYSQL_HOST')
-                mysql_port = os.environ.get('MYSQL_PORT', '3306')
-                mysql_database = os.environ.get('MYSQL_DATABASE')
-                
-                # URL encode password if it contains special characters
-                from urllib.parse import quote_plus
-                mysql_password_encoded = quote_plus(mysql_password) if mysql_password else mysql_password
-                
-                # Validate MySQL parameters
-                if mysql_user and mysql_password and mysql_host and mysql_database:
-                    database_url = f"mysql+pymysql://{mysql_user}:{mysql_password_encoded}@{mysql_host}:{mysql_port}/{mysql_database}"
-                    db_type = "mysql"
-                    logging.info(f"✅ Using MySQL database: {mysql_host}:{mysql_port}/{mysql_database}")
-                else:
-                    logging.warning("⚠️ MySQL configuration incomplete - missing required parameters")
-    except Exception as e:
-        logging.error(f"❌ MySQL configuration error: {e}")
 
 if not database_url:
     logging.info("🔧 No database configured - checking fallback options")
@@ -153,41 +119,46 @@ with app.app_context():
     db.create_all()
     logging.info("Database tables created")
     
-    # Add missing columns for local SQLite development
-    if not database_url:  # Only for local SQLite
-        try:
-            from sqlalchemy import text
+    # Database schema verification and migrations
+    try:
+        from sqlalchemy import text, inspect
+        
+        # Get database dialect
+        dialect = db.engine.dialect.name
+        logging.info(f"🔧 Database dialect: {dialect}")
+        
+        # Check if we're using SQLite and add missing columns
+        if dialect == 'sqlite':
+            logging.info("🔧 Checking for missing columns in SQLite database...")
             
-            # Check if we're using SQLite and add missing columns
-            if 'sqlite' in str(db.engine.url):
-                logging.info("🔧 Checking for missing columns in SQLite database...")
-                
-                # Try to add notes column to grpo_documents if it doesn't exist
-                try:
-                    db.session.execute(text("ALTER TABLE grpo_documents ADD COLUMN notes TEXT"))
-                    db.session.commit()
-                    logging.info("✅ Added 'notes' column to grpo_documents")
-                except Exception as e:
-                    if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
-                        logging.info("✓ 'notes' column already exists")
-                    else:
-                        logging.debug(f"Notes column: {e}")
-                
-                # Try to add serial_number column to grpo_items if it doesn't exist
-                try:
-                    db.session.execute(text("ALTER TABLE grpo_items ADD COLUMN serial_number VARCHAR(50)"))
-                    db.session.commit()
-                    logging.info("✅ Added 'serial_number' column to grpo_items")
-                except Exception as e:
-                    if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
-                        logging.info("✓ 'serial_number' column already exists")
-                    else:
-                        logging.debug(f"Serial number column: {e}")
-                        
-                logging.info("✅ SQLite schema migration completed")
-                
-        except Exception as e:
-            logging.warning(f"Schema migration warning: {e}")
+            # Try to add notes column to grpo_documents if it doesn't exist
+            try:
+                db.session.execute(text("ALTER TABLE grpo_documents ADD COLUMN notes TEXT"))
+                db.session.commit()
+                logging.info("✅ Added 'notes' column to grpo_documents")
+            except Exception as e:
+                if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+                    logging.info("✓ 'notes' column already exists")
+                else:
+                    logging.debug(f"Notes column: {e}")
+            
+            # Try to add serial_number column to grpo_items if it doesn't exist
+            try:
+                db.session.execute(text("ALTER TABLE grpo_items ADD COLUMN serial_number VARCHAR(50)"))
+                db.session.commit()
+                logging.info("✅ Added 'serial_number' column to grpo_items")
+            except Exception as e:
+                if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+                    logging.info("✓ 'serial_number' column already exists")
+                else:
+                    logging.debug(f"Serial number column: {e}")
+                    
+            logging.info("✅ SQLite schema migration completed")
+        else:
+            logging.info("✓ Using PostgreSQL - schema managed by SQLAlchemy")
+            
+    except Exception as e:
+        logging.warning(f"Schema migration warning: {e}")
 
     # Create default branch (with error handling for MySQL)
     try:
@@ -205,7 +176,6 @@ with app.app_context():
             logging.info("Default branch created")
     except Exception as e:
         logging.warning(f"Could not create/query default branch: {e}")
-        logging.info("Please run fix_mysql_database.py to fix database schema")
         # Continue with application startup
 
     # Create default admin user (with error handling for MySQL)
@@ -228,7 +198,6 @@ with app.app_context():
             logging.info("Default admin user created")
     except Exception as e:
         logging.warning(f"Could not create/query admin user: {e}")
-        logging.info("Please run quick_mysql_fix.py to fix database schema")
         # Continue with application startup
 
 # Import routes to register them
