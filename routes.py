@@ -2084,3 +2084,148 @@ def preview_grn_json(grn_id):
         import traceback
         logging.error(f"🔍 Full traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)})
+
+# API Endpoints for Warehouse, Bin, and Batch Dropdowns
+@app.route("/api/warehouses", methods=["GET"])
+@login_required
+def api_get_warehouses():
+    """Get all warehouses from SAP B1"""
+    try:
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        warehouses = sap.get_warehouses()
+        
+        return jsonify({
+            "success": True,
+            "warehouses": warehouses
+        })
+    except Exception as e:
+        logging.error(f"Error getting warehouses: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "warehouses": []
+        })
+
+@app.route("/api/warehouses/<warehouse_code>/bins", methods=["GET"])
+@login_required
+def api_get_warehouse_bins(warehouse_code):
+    """Get bin locations for specific warehouse from SAP B1"""
+    try:
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        
+        # Get bin locations for warehouse using your API pattern
+        if not sap.ensure_logged_in():
+            # Return mock data for offline mode
+            bins = [
+                {"BinCode": f"{warehouse_code}-SYSTEM-BIN-LOCATION", "Description": "System Bin Location"},
+                {"BinCode": f"{warehouse_code}-A-01-001", "Description": "Main Storage Area A"},
+                {"BinCode": f"{warehouse_code}-B-01-001", "Description": "Secondary Storage Area B"}
+            ]
+        else:
+            # Use real SAP B1 API
+            url = f"{sap.base_url}/b1s/v1/BinLocations"
+            params = {
+                "$filter": f"Warehouse eq '{warehouse_code}'"
+            }
+            
+            response = sap.session.get(url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                bin_locations = data.get("value", [])
+                
+                bins = []
+                for bin_loc in bin_locations:
+                    bins.append({
+                        "BinCode": bin_loc.get("BinCode"),
+                        "Description": bin_loc.get("Description") or "",
+                        "AbsEntry": bin_loc.get("AbsEntry")
+                    })
+            else:
+                logging.error(f"Failed to get bins for warehouse {warehouse_code}: {response.status_code}")
+                bins = []
+        
+        return jsonify({
+            "success": True,
+            "bins": bins
+        })
+    except Exception as e:
+        logging.error(f"Error getting bins for warehouse {warehouse_code}: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "bins": []
+        })
+
+@app.route("/api/warehouses/<warehouse_code>/batches", methods=["GET"])
+@login_required
+def api_get_warehouse_batches(warehouse_code):
+    """Get batch numbers for specific warehouse from SAP B1"""
+    try:
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        
+        # Get batch details using your API pattern
+        if not sap.ensure_logged_in():
+            # Return mock data for offline mode
+            batches = [
+                {"Batch": "20220729", "ItemCode": "CO0727Y", "ExpirationDate": "2025-12-31"},
+                {"Batch": "20230815", "ItemCode": "CO0727Y", "ExpirationDate": "2025-11-30"},
+                {"Batch": "20240101", "ItemCode": "ITM002", "ExpirationDate": "2025-10-15"}
+            ]
+        else:
+            # Use real SAP B1 API to get batches by item code
+            item_code = request.args.get("item_code", "")
+            
+            if item_code:
+                # Get batches for specific item code
+                url = f"{sap.base_url}/b1s/v1/BatchNumberDetails"
+                params = {
+                    "$filter": f"ItemCode eq '{item_code}'"
+                }
+            else:
+                # Get all batches (limited for performance)
+                url = f"{sap.base_url}/b1s/v1/BatchNumberDetails"
+                params = {
+                    "$top": 50  # Limit results for performance
+                }
+            
+            response = sap.session.get(url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                batch_details = data.get("value", [])
+                
+                batches = []
+                for batch in batch_details:
+                    expiration_date = batch.get("ExpirationDate", "")
+                    if expiration_date and "T" in expiration_date:
+                        # Convert SAP date format to simple date
+                        expiration_date = expiration_date.split("T")[0]
+                    
+                    batches.append({
+                        "Batch": batch.get("Batch"),
+                        "ItemCode": batch.get("ItemCode"),
+                        "ItemDescription": batch.get("ItemDescription", ""),
+                        "ExpirationDate": expiration_date,
+                        "Status": batch.get("Status", ""),
+                        "SystemNumber": batch.get("SystemNumber")
+                    })
+            else:
+                logging.error(f"Failed to get batches for warehouse {warehouse_code}: {response.status_code}")
+                batches = []
+        
+        return jsonify({
+            "success": True,
+            "batches": batches
+        })
+    except Exception as e:
+        logging.error(f"Error getting batches for warehouse {warehouse_code}: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "batches": []
+        })
+

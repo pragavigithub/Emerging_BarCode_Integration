@@ -770,9 +770,9 @@ function showJsonPreview(grnId) {
 }
 
 // Warehouse, Bin, and Batch Management Functions
-let warehouses = [];
-let bins = [];
-let batches = [];
+var warehousesData = [];
+var binsData = [];
+var batchesData = [];
 
 // Load warehouses when modal opens
 function loadWarehouses() {
@@ -780,11 +780,11 @@ function loadWarehouses() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                warehouses = data.warehouses;
+                warehousesData = data.warehouses;
                 const warehouseSelect = document.getElementById('warehouse_select');
                 warehouseSelect.innerHTML = '<option value="">Select Warehouse...</option>';
                 
-                warehouses.forEach(wh => {
+                warehousesData.forEach(wh => {
                     const option = document.createElement('option');
                     option.value = wh.WarehouseCode;
                     option.textContent = `${wh.WarehouseCode} - ${wh.WarehouseName}`;
@@ -830,11 +830,11 @@ function loadBins(warehouseCode) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                bins = data.bins;
+                binsData = data.bins;
                 const binSelect = document.getElementById('bin_select');
                 binSelect.innerHTML = '<option value="">Select Bin Location...</option>';
                 
-                bins.forEach(bin => {
+                binsData.forEach(bin => {
                     const option = document.createElement('option');
                     option.value = bin.BinCode;
                     option.textContent = `${bin.BinCode} - ${bin.Description || ''}`;
@@ -855,11 +855,11 @@ function loadBatches(warehouseCode) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                batches = data.batches;
+                batchesData = data.batches;
                 const batchSelect = document.getElementById('batch_select');
                 batchSelect.innerHTML = '<option value="">Select Batch...</option>';
                 
-                batches.forEach(batch => {
+                batchesData.forEach(batch => {
                     const option = document.createElement('option');
                     option.value = batch.Batch;
                     option.textContent = `${batch.Batch} - ${batch.ItemCode} (Exp: ${batch.ExpirationDate})`;
@@ -898,7 +898,7 @@ function handleBatchSelection() {
         batchSelect.parentElement.style.display = 'flex';
         
         // Auto-fill expiration date if available
-        const selectedBatch = batches.find(b => b.Batch === batchSelect.value);
+        const selectedBatch = batchesData.find(b => b.Batch === batchSelect.value);
         if (selectedBatch && selectedBatch.ExpirationDate) {
             expirationDate.value = selectedBatch.ExpirationDate;
         }
@@ -953,11 +953,14 @@ function toggleManualBatch() {
     }
 }
 
-// Load warehouses when modal is opened
-$(document).ready(function() {
-    $('#addItemModal').on('show.bs.modal', function() {
-        loadWarehouses();
-    });
+// Load warehouses when modal is opened - using vanilla JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    const addItemModal = document.getElementById('addItemModal');
+    if (addItemModal) {
+        addItemModal.addEventListener('show.bs.modal', function() {
+            loadWarehouses();
+        });
+    }
 });
 
 // Prevent multiple POST submissions
