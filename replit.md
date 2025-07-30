@@ -140,6 +140,15 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 30, 2025. Project Migration and Cleanup Complete - COMPLETED:
+  - Successfully completed migration from Replit Agent to Replit environment
+  - Cleaned up all duplicate MySQL migration files and created single comprehensive mysql_migration.py script
+  - Removed 30+ unnecessary .md documentation files, keeping only replit.md as single source of truth
+  - Fixed critical GRN batch dropdown issue - batches now properly filter by ItemCode using /api/items/<item_code>/batches endpoint
+  - Created complete MySQL migration script with admin user (admin/admin123) and all table schemas
+  - Enhanced batch loading functionality to enable dropdown when item is selected in GRN Add Item modal
+  - Application running successfully on PostgreSQL with all WMS functionality operational
+  - Single MySQL migration file supports complete local development database setup
 - July 30, 2025. Critical MySQL Bin Location Column Size Fix - COMPLETED:
   - Fixed "Data too long for column 'bin_location'" error in MySQL local environments
   - Created fix_mysql_bin_location.py script to increase bin_location column from VARCHAR(20) to VARCHAR(100)

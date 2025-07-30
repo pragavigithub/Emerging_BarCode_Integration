@@ -2235,6 +2235,66 @@ def api_get_warehouse_batches(warehouse_code):
             "batches": []
         })
 
+@app.route("/api/items/<item_code>/batches", methods=["GET"])
+@login_required
+def get_item_batches(item_code):
+    """Get all batches for a specific item code"""
+    try:
+        from sap_integration import SAPIntegration
+        sap = SAPIntegration()
+        
+        # Get batch details using SAP B1 API filtered by ItemCode
+        if not sap.ensure_logged_in():
+            # Return mock data for offline mode
+            batches = [
+                {"Batch": "20240101", "ItemCode": item_code, "ExpirationDate": "2025-12-31"},
+                {"Batch": "20240201", "ItemCode": item_code, "ExpirationDate": "2025-11-30"},
+                {"Batch": "20240301", "ItemCode": item_code, "ExpirationDate": "2025-10-15"}
+            ]
+        else:
+            # Use real SAP B1 API to get batches by item code
+            url = f"{sap.base_url}/b1s/v1/BatchNumberDetails"
+            params = {
+                "$filter": f"ItemCode eq '{item_code}'"
+            }
+            
+            response = sap.session.get(url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                batch_details = data.get("value", [])
+                
+                batches = []
+                for batch in batch_details:
+                    expiration_date = batch.get("ExpirationDate", "")
+                    if expiration_date and "T" in expiration_date:
+                        # Convert SAP date format to simple date
+                        expiration_date = expiration_date.split("T")[0]
+                    
+                    batches.append({
+                        "Batch": batch.get("Batch"),
+                        "ItemCode": batch.get("ItemCode"),
+                        "ItemDescription": batch.get("ItemDescription", ""),
+                        "ExpirationDate": expiration_date,
+                        "Status": batch.get("Status", ""),
+                        "SystemNumber": batch.get("SystemNumber")
+                    })
+            else:
+                logging.error(f"Failed to get batches for item {item_code}: {response.status_code}")
+                batches = []
+        
+        return jsonify({
+            "success": True,
+            "batches": batches
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting item batches: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 
 
 

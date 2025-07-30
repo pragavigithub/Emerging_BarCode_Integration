@@ -468,8 +468,14 @@ function addItemToGRN(itemCode, itemName, uom, warehouseCode, poItemData) {
     document.getElementById('expiration_date').value = '';
     document.getElementById('barcode').value = '';
     
-    // Load batches for this specific item code
+    // Load batches for this specific item code and enable batch dropdown
     loadBatchesForItem(itemCode);
+    
+    // Enable batch dropdown since we have an item code
+    const batchSelect = document.getElementById('batch_select');
+    if (batchSelect) {
+        batchSelect.disabled = false;
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
