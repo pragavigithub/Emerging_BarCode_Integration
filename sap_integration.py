@@ -3442,3 +3442,79 @@ class SAPIntegration:
                 logging.info("Logged out from SAP B1")
             except Exception as e:
                 logging.error(f"Error logging out from SAP B1: {str(e)}")
+
+    def get_warehouses(self):
+        """Get all available warehouses"""
+        if not self.ensure_logged_in():
+            # Return mock data for offline mode
+            return [
+                {"WarehouseCode": "WH01", "WarehouseName": "Main Warehouse", "DefaultBin": "A-01-001"},
+                {"WarehouseCode": "WH02", "WarehouseName": "Secondary Warehouse", "DefaultBin": "B-01-001"},
+                {"WarehouseCode": "WH03", "WarehouseName": "Quality Control Warehouse", "DefaultBin": "QC-01-001"}
+            ]
+
+        try:
+            url = f"{self.base_url}/b1s/v1/Warehouses"
+            response = self.session.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                warehouses = data.get("value", [])
+                
+                formatted_warehouses = []
+                for wh in warehouses:
+                    formatted_warehouses.append({
+                        "WarehouseCode": wh.get("WarehouseCode"),
+                        "WarehouseName": wh.get("WarehouseName", ""),
+                        "DefaultBin": wh.get("DefaultBin", "")
+                    })
+                
+                return formatted_warehouses
+            else:
+                logging.error(f"Failed to get warehouses: {response.status_code}")
+                return []
+        except Exception as e:
+            logging.error(f"Error getting warehouses: {str(e)}")
+            return []
+
+    def get_warehouse_batches(self, warehouse_code):
+        """Get all batches available in specific warehouse"""
+        if not self.ensure_logged_in():
+            # Return mock data for offline mode
+            return [
+                {"Batch": "BATCH-001", "ItemCode": "ITM001", "ExpirationDate": "2025-12-31"},
+                {"Batch": "BATCH-002", "ItemCode": "ITM002", "ExpirationDate": "2025-11-30"},
+                {"Batch": "BATCH-003", "ItemCode": "ITM001", "ExpirationDate": "2025-10-15"}
+            ]
+
+        try:
+            # Query BatchNumberDetails filtered by warehouse
+            url = f"{self.base_url}/b1s/v1/BatchNumberDetails"
+            params = {
+                "$filter": f"Location eq \"{warehouse_code}\"",
+                "$select": "Batch,ItemCode,ExpirationDate,Quantity"
+            }
+            
+            response = self.session.get(url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                batches = data.get("value", [])
+                
+                formatted_batches = []
+                for batch in batches:
+                    formatted_batches.append({
+                        "Batch": batch.get("Batch"),
+                        "ItemCode": batch.get("ItemCode"),
+                        "ExpirationDate": batch.get("ExpirationDate", ""),
+                        "Quantity": batch.get("Quantity", 0)
+                    })
+                
+                return formatted_batches
+            else:
+                logging.error(f"Failed to get batches for warehouse {warehouse_code}: {response.status_code}")
+                return []
+        except Exception as e:
+            logging.error(f"Error getting batches for warehouse {warehouse_code}: {str(e)}")
+            return []
+

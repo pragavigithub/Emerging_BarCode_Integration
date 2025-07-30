@@ -140,6 +140,17 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 30, 2025. Enhanced GRN Form with Dynamic Dropdowns - COMPLETED:
+  - Added comprehensive dropdown system for Warehouses, Bin Locations, and Batches in GRN Add Item form
+  - Implemented API endpoints: /api/warehouses, /api/warehouses/<code>/bins, /api/warehouses/<code>/batches
+  - Created dynamic JavaScript functions for real-time warehouse/bin/batch loading
+  - Added manual entry options with toggle buttons for all dropdown fields
+  - Enhanced SAP integration with get_warehouses() and get_warehouse_batches() methods
+  - Dropdowns populate from live SAP B1 data with offline mock data fallback
+  - Auto-fill expiration date when batch is selected from dropdown
+  - Cascading dropdowns: Warehouse selection enables Bin and Batch dropdowns
+  - Professional UI with Bootstrap input groups and toggle buttons for manual entry
+  - Maintains backward compatibility with existing manual entry functionality
 - July 30, 2025. GRPO to GRN (Goods Received Note) Migration - COMPLETED:
   - Changed all GRPO terminology to "Goods Received Note (GRN)" throughout the application as requested
   - Updated database models: GRPODocument → GRNDocument, GRPOItem → GRNItem

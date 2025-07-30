@@ -216,6 +216,66 @@ def grn_detail(grn_id):
     
     return render_template('grn_detail.html', grn_doc=grn_doc, po_items=po_items)
 
+@app.route('/api/warehouses')
+@login_required
+def get_warehouses():
+    """Get all available warehouses"""
+    try:
+        sap = SAPIntegration()
+        warehouses = sap.get_warehouses()
+        
+        return jsonify({
+            'success': True,
+            'warehouses': warehouses
+        })
+    except Exception as e:
+        logging.error(f"Error fetching warehouses: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'warehouses': []
+        })
+
+@app.route('/api/warehouses/<warehouse_code>/bins')
+@login_required
+def get_warehouse_bins(warehouse_code):
+    """Get bin locations for specific warehouse"""
+    try:
+        sap = SAPIntegration()
+        bins = sap.get_warehouse_bins(warehouse_code)
+        
+        return jsonify({
+            'success': True,
+            'bins': bins
+        })
+    except Exception as e:
+        logging.error(f"Error fetching bins for warehouse {warehouse_code}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'bins': []
+        })
+
+@app.route('/api/warehouses/<warehouse_code>/batches')
+@login_required
+def get_warehouse_batches(warehouse_code):
+    """Get all batches in specific warehouse"""
+    try:
+        sap = SAPIntegration()
+        batches = sap.get_warehouse_batches(warehouse_code)
+        
+        return jsonify({
+            'success': True,
+            'batches': batches
+        })
+    except Exception as e:
+        logging.error(f"Error fetching batches for warehouse {warehouse_code}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'batches': []
+        })
+
 @app.route('/api/batch-numbers/<item_code>')
 @login_required
 def get_batch_numbers(item_code):

@@ -337,28 +337,55 @@
                         </div>
                     </div>
                     
-                    <!-- Warehouse and Bin Location -->
+                    <!-- Warehouse Selection -->
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="warehouse_code" class="form-label">Warehouse Code <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="warehouse_code" name="warehouse_code" required>
+                                <label for="warehouse_code" class="form-label">Warehouse <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <select class="form-select" id="warehouse_select" onchange="handleWarehouseSelection()">
+                                        <option value="">Select Warehouse...</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleManualWarehouse()" title="Enter manually">
+                                        <i data-feather="edit-3"></i>
+                                    </button>
+                                </div>
+                                <input type="text" class="form-control mt-2" id="warehouse_code" name="warehouse_code" 
+                                       placeholder="Or enter warehouse code manually" style="display: none;" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="bin_location" class="form-label">Bin Location</label>
-                                <input type="text" class="form-control" id="bin_location" name="bin_location">
+                                <div class="input-group">
+                                    <select class="form-select" id="bin_select" onchange="handleBinSelection()" disabled>
+                                        <option value="">Select Bin Location...</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleManualBin()" title="Enter manually">
+                                        <i data-feather="edit-3"></i>
+                                    </button>
+                                </div>
+                                <input type="text" class="form-control mt-2" id="bin_location" name="bin_location" 
+                                       placeholder="Or enter bin location manually" style="display: none;">
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Serial/Batch Management Section -->
+                    <!-- Batch Management Section -->
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="batch_number" class="form-label">Batch Number</label>
-                                <input type="text" class="form-control" id="batch_number" name="batch_number">
+                                <div class="input-group">
+                                    <select class="form-select" id="batch_select" onchange="handleBatchSelection()" disabled>
+                                        <option value="">Select Batch...</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleManualBatch()" title="Enter manually">
+                                        <i data-feather="edit-3"></i>
+                                    </button>
+                                </div>
+                                <input type="text" class="form-control mt-2" id="batch_number" name="batch_number" 
+                                       placeholder="Or enter batch number manually" style="display: none;">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -741,6 +768,197 @@ function showJsonPreview(grnId) {
             alert('Error getting JSON preview');
         });
 }
+
+// Warehouse, Bin, and Batch Management Functions
+let warehouses = [];
+let bins = [];
+let batches = [];
+
+// Load warehouses when modal opens
+function loadWarehouses() {
+    fetch('/api/warehouses')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                warehouses = data.warehouses;
+                const warehouseSelect = document.getElementById('warehouse_select');
+                warehouseSelect.innerHTML = '<option value="">Select Warehouse...</option>';
+                
+                warehouses.forEach(wh => {
+                    const option = document.createElement('option');
+                    option.value = wh.WarehouseCode;
+                    option.textContent = `${wh.WarehouseCode} - ${wh.WarehouseName}`;
+                    warehouseSelect.appendChild(option);
+                });
+            } else {
+                console.error('Error loading warehouses:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching warehouses:', error);
+        });
+}
+
+// Handle warehouse selection
+function handleWarehouseSelection() {
+    const warehouseSelect = document.getElementById('warehouse_select');
+    const warehouseCode = document.getElementById('warehouse_code');
+    const binSelect = document.getElementById('bin_select');
+    const batchSelect = document.getElementById('batch_select');
+    
+    if (warehouseSelect.value) {
+        warehouseCode.value = warehouseSelect.value;
+        warehouseCode.style.display = 'none';
+        warehouseSelect.parentElement.style.display = 'flex';
+        
+        // Enable bin select and load bins
+        binSelect.disabled = false;
+        batchSelect.disabled = false;
+        loadBins(warehouseSelect.value);
+        loadBatches(warehouseSelect.value);
+    } else {
+        binSelect.disabled = true;
+        batchSelect.disabled = true;
+        binSelect.innerHTML = '<option value="">Select Bin Location...</option>';
+        batchSelect.innerHTML = '<option value="">Select Batch...</option>';
+    }
+}
+
+// Load bins for selected warehouse
+function loadBins(warehouseCode) {
+    fetch(`/api/warehouses/${warehouseCode}/bins`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                bins = data.bins;
+                const binSelect = document.getElementById('bin_select');
+                binSelect.innerHTML = '<option value="">Select Bin Location...</option>';
+                
+                bins.forEach(bin => {
+                    const option = document.createElement('option');
+                    option.value = bin.BinCode;
+                    option.textContent = `${bin.BinCode} - ${bin.Description || ''}`;
+                    binSelect.appendChild(option);
+                });
+            } else {
+                console.error('Error loading bins:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching bins:', error);
+        });
+}
+
+// Load batches for selected warehouse
+function loadBatches(warehouseCode) {
+    fetch(`/api/warehouses/${warehouseCode}/batches`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                batches = data.batches;
+                const batchSelect = document.getElementById('batch_select');
+                batchSelect.innerHTML = '<option value="">Select Batch...</option>';
+                
+                batches.forEach(batch => {
+                    const option = document.createElement('option');
+                    option.value = batch.Batch;
+                    option.textContent = `${batch.Batch} - ${batch.ItemCode} (Exp: ${batch.ExpirationDate})`;
+                    batchSelect.appendChild(option);
+                });
+            } else {
+                console.error('Error loading batches:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching batches:', error);
+        });
+}
+
+// Handle bin selection
+function handleBinSelection() {
+    const binSelect = document.getElementById('bin_select');
+    const binLocation = document.getElementById('bin_location');
+    
+    if (binSelect.value) {
+        binLocation.value = binSelect.value;
+        binLocation.style.display = 'none';
+        binSelect.parentElement.style.display = 'flex';
+    }
+}
+
+// Handle batch selection
+function handleBatchSelection() {
+    const batchSelect = document.getElementById('batch_select');
+    const batchNumber = document.getElementById('batch_number');
+    const expirationDate = document.getElementById('expiration_date');
+    
+    if (batchSelect.value) {
+        batchNumber.value = batchSelect.value;
+        batchNumber.style.display = 'none';
+        batchSelect.parentElement.style.display = 'flex';
+        
+        // Auto-fill expiration date if available
+        const selectedBatch = batches.find(b => b.Batch === batchSelect.value);
+        if (selectedBatch && selectedBatch.ExpirationDate) {
+            expirationDate.value = selectedBatch.ExpirationDate;
+        }
+    }
+}
+
+// Toggle manual warehouse entry
+function toggleManualWarehouse() {
+    const warehouseSelect = document.getElementById('warehouse_select');
+    const warehouseCode = document.getElementById('warehouse_code');
+    
+    if (warehouseCode.style.display === 'none') {
+        warehouseCode.style.display = 'block';
+        warehouseSelect.parentElement.style.display = 'none';
+        warehouseCode.focus();
+    } else {
+        warehouseCode.style.display = 'none';
+        warehouseSelect.parentElement.style.display = 'flex';
+        warehouseSelect.focus();
+    }
+}
+
+// Toggle manual bin entry
+function toggleManualBin() {
+    const binSelect = document.getElementById('bin_select');
+    const binLocation = document.getElementById('bin_location');
+    
+    if (binLocation.style.display === 'none') {
+        binLocation.style.display = 'block';
+        binSelect.parentElement.style.display = 'none';
+        binLocation.focus();
+    } else {
+        binLocation.style.display = 'none';
+        binSelect.parentElement.style.display = 'flex';
+        binSelect.focus();
+    }
+}
+
+// Toggle manual batch entry
+function toggleManualBatch() {
+    const batchSelect = document.getElementById('batch_select');
+    const batchNumber = document.getElementById('batch_number');
+    
+    if (batchNumber.style.display === 'none') {
+        batchNumber.style.display = 'block';
+        batchSelect.parentElement.style.display = 'none';
+        batchNumber.focus();
+    } else {
+        batchNumber.style.display = 'none';
+        batchSelect.parentElement.style.display = 'flex';
+        batchSelect.focus();
+    }
+}
+
+// Load warehouses when modal is opened
+$(document).ready(function() {
+    $('#addItemModal').on('show.bs.modal', function() {
+        loadWarehouses();
+    });
+});
 
 // Prevent multiple POST submissions
 function postToSAPConfirm(button) {
