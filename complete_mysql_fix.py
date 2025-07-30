@@ -216,12 +216,73 @@ def complete_mysql_fix():
         except Exception as e:
             print(f"⚠️ Error updating document series: {e}")
         
-        # Update user permissions from grpo to grn
+        # Update user permissions from grpo to grn  
         try:
             cursor.execute("UPDATE users SET permissions = REPLACE(permissions, '\"grpo\"', '\"grn\"') WHERE permissions LIKE '%grpo%'")
+            cursor.execute("UPDATE users SET permissions = REPLACE(permissions, 'grpo', 'grn') WHERE permissions LIKE '%grpo%'")
             print("✅ Updated user permissions from grpo to grn")
         except Exception as e:
             print(f"⚠️ Error updating permissions: {e}")
+        
+        print("📝 Step 9: Complete GRPO to GRN migration...")
+        
+        # Ensure GRN tables exist even if GRPO tables didn't exist
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS grn_documents (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    po_number VARCHAR(50) NOT NULL,
+                    supplier_code VARCHAR(20),
+                    supplier_name VARCHAR(255),
+                    po_date DATE,
+                    po_total DECIMAL(15,2),
+                    user_id INT NOT NULL,
+                    status VARCHAR(20) DEFAULT 'draft',
+                    notes TEXT,
+                    sap_document_number VARCHAR(50),
+                    qc_user_id INT,
+                    qc_notes TEXT, 
+                    draft_or_post VARCHAR(20) DEFAULT 'draft',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    INDEX idx_po_number (po_number),
+                    INDEX idx_user_id (user_id),
+                    INDEX idx_status (status)
+                )
+            """)
+            print("✅ GRN documents table ensured")
+        except Exception as e:
+            print(f"⚠️ GRN documents table error: {e}")
+        
+        try:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS grn_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    grn_document_id INT NOT NULL,
+                    item_code VARCHAR(50) NOT NULL,
+                    item_name VARCHAR(255),
+                    uom VARCHAR(20),
+                    po_quantity DECIMAL(15,3),
+                    received_quantity DECIMAL(15,3) DEFAULT 0,
+                    warehouse_code VARCHAR(20),
+                    bin_location VARCHAR(50),
+                    batch_number VARCHAR(50),
+                    expiration_date DATE,
+                    serial_number VARCHAR(100),
+                    barcode VARCHAR(100),
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (grn_document_id) REFERENCES grn_documents(id) ON DELETE CASCADE,
+                    INDEX idx_grn_document (grn_document_id),
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_batch_number (batch_number)
+                )
+            """)
+            print("✅ GRN items table ensured")
+        except Exception as e:
+            print(f"⚠️ GRN items table error: {e}")
         
         print("\n🎉 Complete MySQL fix successful!")
         print("✓ All database schema issues resolved")

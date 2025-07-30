@@ -1,47 +1,47 @@
 """
-GRPO (Goods Receipt PO) Routes
-All routes related to goods receipt against purchase orders
+GRN (Goods Received Note) Routes
+All routes related to goods received notes against purchase orders
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from app import db
-from modules.grpo.models import GRPODocument, GRPOItem
+from modules.grpo.models import GRNDocument, GRNItem
 from modules.shared.models import User
 import logging
 from datetime import datetime
 
-grpo_bp = Blueprint('grpo', __name__, url_prefix='/grpo')
+grn_bp = Blueprint('grn', __name__, url_prefix='/grn')
 
-@grpo_bp.route('/')
+@grn_bp.route('/')
 @login_required
 def index():
-    """GRPO main page - list all GRPOs for current user"""
-    if not current_user.has_permission('grpo'):
-        flash('Access denied - GRPO permissions required', 'error')
+    """GRN main page - list all GRNs for current user"""
+    if not current_user.has_permission('grn'):
+        flash('Access denied - GRN permissions required', 'error')
         return redirect(url_for('dashboard'))
     
-    grpos = GRPODocument.query.filter_by(user_id=current_user.id).order_by(GRPODocument.created_at.desc()).all()
-    return render_template('grpo/grpo.html', grpos=grpos)
+    grns = GRNDocument.query.filter_by(user_id=current_user.id).order_by(GRNDocument.created_at.desc()).all()
+    return render_template('grpo/grn.html', grns=grns)
 
-@grpo_bp.route('/detail/<int:grpo_id>')
+@grn_bp.route('/detail/<int:grn_id>')
 @login_required
-def detail(grpo_id):
-    """GRPO detail page"""
-    grpo = GRPODocument.query.get_or_404(grpo_id)
+def detail(grn_id):
+    """GRN detail page"""
+    grn = GRNDocument.query.get_or_404(grn_id)
     
     # Check permissions
-    if grpo.user_id != current_user.id and current_user.role not in ['admin', 'manager', 'qc']:
-        flash('Access denied - You can only view your own GRPOs', 'error')
-        return redirect(url_for('grpo.index'))
+    if grn.user_id != current_user.id and current_user.role not in ['admin', 'manager', 'qc']:
+        flash('Access denied - You can only view your own GRNs', 'error')
+        return redirect(url_for('grn.index'))
     
-    return render_template('grpo/grpo_detail.html', grpo=grpo)
+    return render_template('grpo/grn_detail.html', grn=grn)
 
-@grpo_bp.route('/create', methods=['GET', 'POST'])
+@grn_bp.route('/create', methods=['GET', 'POST'])
 @login_required
 def create():
-    """Create new GRPO"""
-    if not current_user.has_permission('grpo'):
-        flash('Access denied - GRPO permissions required', 'error')
+    """Create new GRN"""
+    if not current_user.has_permission('grn'):
+        flash('Access denied - GRN permissions required', 'error')
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
@@ -49,29 +49,29 @@ def create():
         
         if not po_number:
             flash('PO number is required', 'error')
-            return redirect(url_for('grpo.create'))
+            return redirect(url_for('grn.create'))
         
-        # Check if GRPO already exists for this PO
-        existing_grpo = GRPODocument.query.filter_by(po_number=po_number, user_id=current_user.id).first()
-        if existing_grpo:
-            flash(f'GRPO already exists for PO {po_number}', 'warning')
-            return redirect(url_for('grpo.detail', grpo_id=existing_grpo.id))
+        # Check if GRN already exists for this PO
+        existing_grn = GRNDocument.query.filter_by(po_number=po_number, user_id=current_user.id).first()
+        if existing_grn:
+            flash(f'GRN already exists for PO {po_number}', 'warning')
+            return redirect(url_for('grn.detail', grn_id=existing_grn.id))
         
-        # Create new GRPO
-        grpo = GRPODocument(
+        # Create new GRN
+        grn = GRNDocument(
             po_number=po_number,
             user_id=current_user.id,
             status='draft'
         )
         
-        db.session.add(grpo)
+        db.session.add(grn)
         db.session.commit()
         
-        logging.info(f"✅ GRPO created for PO {po_number} by user {current_user.username}")
-        flash(f'GRPO created for PO {po_number}', 'success')
-        return redirect(url_for('grpo.detail', grpo_id=grpo.id))
+        logging.info(f"✅ GRN created for PO {po_number} by user {current_user.username}")
+        flash(f'GRN created for PO {po_number}', 'success')
+        return redirect(url_for('grn.detail', grn_id=grn.id))
     
-    return render_template('grpo/create_grpo.html')
+    return render_template('grpo/create_grn.html')
 
 @grpo_bp.route('/<int:grpo_id>/submit', methods=['POST'])
 @login_required
