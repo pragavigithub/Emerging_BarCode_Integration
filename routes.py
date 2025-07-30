@@ -8,6 +8,12 @@ import json
 from app import app, db, login_manager
 from models import User, GRNDocument, GRNItem, InventoryTransfer, InventoryTransferItem, PickList, PickListItem, InventoryCount, InventoryCountItem, BarcodeLabel, BinScanningLog, DocumentNumberSeries
 from sap_integration import SAPIntegration
+from sap_extensions import get_bin_locations, get_batch_details, post_grn_to_sap
+
+# Monkey patch the missing methods to SAPIntegration class
+SAPIntegration.get_bin_locations = lambda self, warehouse_code: get_bin_locations(self, warehouse_code)
+SAPIntegration.get_batch_details = lambda self, item_code: get_batch_details(self, item_code)  
+SAPIntegration.post_grn_to_sap = lambda self, grn_doc: post_grn_to_sap(self, grn_doc)
 
 # BinScanningLog is now imported above
 
@@ -2228,4 +2234,7 @@ def api_get_warehouse_batches(warehouse_code):
             "error": str(e),
             "batches": []
         })
+
+
+
 

@@ -1,0 +1,78 @@
+https://192.168.0.193:50000/b1s/v1/Warehouses
+
+Response:
+https://192.168.0.193:50000/b1s/v1/Warehouses?$filter=WarehouseCode eq 'ORBS-MLD'
+Response:
+BinLocation:
+https://192.168.0.193:50000/b1s/v1/BinLocations?$filter=Warehouse eq 'ORBS-MLD'
+Response:{
+    "odata.metadata": "https://192.168.0.193:50000/b1s/v1/$metadata#BinLocations",
+    "value": [
+        {
+            "AbsEntry": 1390,
+            "Warehouse": "ORBS-MLD",
+            "Sublevel1": "SYSTEM-BIN-LOCATION",
+            "Sublevel2": null,
+            "Sublevel3": null,
+            "Sublevel4": null,
+            "BinCode": "ORBS-MLD-SYSTEM-BIN-LOCATION",
+            "Inactive": "tNO",
+            "Description": null,
+            "AlternativeSortCode": null,
+            "BarCode": null,
+            "Attribute1": null,
+            "Attribute2": null,
+            "Attribute3": null,
+            "Attribute4": null,
+            "Attribute5": null,
+            "Attribute6": null,
+            "Attribute7": null,
+            "Attribute8": null,
+            "Attribute9": null,
+            "Attribute10": null,
+            "RestrictedItemType": "briNone",
+            "SpecificItem": null,
+            "SpecificItemGroup": null,
+            "BatchRestrictions": "brbNoRestrictions",
+            "RestrictedTransType": "brtNoRestrictions",
+            "RestrictionReason": null,
+            "DateRestrictionChanged": null,
+            "MinimumQty": 0.0,
+            "MaximumQty": 0.0,
+            "IsSystemBin": "tYES",
+            "ReceivingBinLocation": "tNO",
+            "ExcludeAutoAllocOnIssue": "tNO",
+            "MaximumWeight": 0.0,
+            "MaximumWeight1": 0.0,
+            "MaximumWeightUnit": null,
+            "MaximumWeightUnit1": null,
+            "RestrictedUoMType": "bruNone",
+            "SpecificUoM": null,
+            "SpecificUoMGroup": null
+        }
+    ]
+}
+
+Batch Based On ItemCode:
+https://192.168.0.193:50000/b1s/v1/BatchNumberDetails?$filter=ItemCode eq 'CO0727Y'
+Response:{
+    "odata.metadata": "https://192.168.0.193:50000/b1s/v1/$metadata#BatchNumberDetails",
+    "value": [
+        {
+            "DocEntry": 3,
+            "ItemCode": "CO0727Y",
+            "ItemDescription": "COATED LHS INSERT",
+            "Status": "bdsStatus_Released",
+            "Batch": "20220729",
+            "BatchAttribute1": null,
+            "BatchAttribute2": null,
+            "AdmissionDate": "2022-07-29T00:00:00Z",
+            "ManufacturingDate": null,
+            "ExpirationDate": null,
+            "Details": null,
+            "SystemNumber": 1
+        }
+    ]
+}
+
+Here i provide the GRN Screen Warehouse DropDown and BinLocation and Batch details as a DropDown..How to Get though API shown the GRN Screen
