@@ -264,7 +264,7 @@
             <div class="card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
-                        <a href="{{ url_for('grpo') }}" class="btn btn-secondary">
+                        <a href="{{ url_for('grn') }}" class="btn btn-secondary">
                             <i data-feather="arrow-left"></i> Back to GRN List
                         </a>
                         <div>
@@ -396,7 +396,7 @@ function updateField(element) {
     const fieldName = element.getAttribute('data-field');
     const value = element.value;
     
-    fetch('/grpo/item/' + itemId + '/update_field', {
+    fetch('/grn/item/' + itemId + '/update_field', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -466,7 +466,7 @@ function generateBarcode(itemId, itemCode) {
     const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase();
     const generatedBarcode = 'WMS-' + itemCode + '-' + randomHex;
     
-    fetch('/grpo/item/' + itemId + '/update_field', {
+    fetch('/grn/item/' + itemId + '/update_field', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -491,12 +491,12 @@ function generateBarcode(itemId, itemCode) {
 }
 
 // Generate QR Label with PO Number
-function generateQRLabel(itemCode, itemName, batchNumber, grpoId, poNumber) {
+function generateQRLabel(itemCode, itemName, batchNumber, grnId, poNumber) {
     const data = {
         item_code: itemCode,
         item_name: itemName,
         batch_number: batchNumber,
-        grn_id: grpoId,
+        grn_id: grnId,
         po_number: poNumber
     };
     
@@ -607,7 +607,7 @@ function printQRLabel() {
 }
 
 // GRN submission functions
-function submitGRN(grpoId) {
+function submitGRN(grnId) {
     const submitBtn = document.getElementById('submitQCBtn');
     if (submitBtn && submitBtn.disabled) {
         return;
@@ -619,7 +619,7 @@ function submitGRN(grpoId) {
             submitBtn.innerHTML = '<i data-feather="loader"></i> Submitting...';
         }
         
-        fetch('/grpo/' + grpoId + '/submit', {
+        fetch('/grn/' + grnId + '/submit', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -648,7 +648,7 @@ function submitGRN(grpoId) {
     }
 }
 
-function approveGRN(grpoId) {
+function approveGRN(grnId) {
     const approveBtn = event.target;
     if (approveBtn.disabled) {
         return;
@@ -658,7 +658,7 @@ function approveGRN(grpoId) {
         approveBtn.disabled = true;
         approveBtn.innerHTML = '<i data-feather="loader"></i> Posting to SAP B1...';
         
-        fetch('/grpo/' + grpoId + '/approve', {
+        fetch('/grn/' + grnId + '/approve', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -693,9 +693,9 @@ function approveGRN(grpoId) {
     }
 }
 
-function rejectGRN(grpoId) {
+function rejectGRN(grnId) {
     if (confirm('Reject this GRN?')) {
-        fetch('/grpo/' + grpoId + '/reject', {
+        fetch('/grn/' + grnId + '/reject', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -725,8 +725,8 @@ function rejectGRN(grpoId) {
     }
 }
 
-function showJsonPreview(grpoId) {
-    fetch('/api/grpo/' + grpoId + '/preview_json')
+function showJsonPreview(grnId) {
+    fetch('/api/grn/' + grnId + '/preview_json')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
