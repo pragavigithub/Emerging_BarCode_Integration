@@ -55,7 +55,7 @@
         </div>
     </div>
 
-    <!-- Pending GRPOs -->
+    <!-- Pending GRNs -->
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -63,7 +63,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             <i data-feather="clipboard"></i> 
-                            Pending GRPO Approvals
+                            Pending GRN Approvals
                         </h5>
                         <div>
                             <button class="btn btn-outline-secondary btn-sm" onclick="refreshData()">
@@ -78,7 +78,7 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>GRPO ID</th>
+                                    <th>GRN ID</th>
                                     <th>PO Number</th>
                                     <th>Supplier</th>
                                     <th>Created By</th>
@@ -91,7 +91,7 @@
                             <tbody>
                                 {% for grpo in pending_grpos %}
                                 <tr>
-                                    <td><strong>GRPO-{{ grpo.id }}</strong></td>
+                                    <td><strong>GRN-{{ grpo.id }}</strong></td>
                                     <td>{{ grpo.po_number }}</td>
                                     <td>
                                         <div>
@@ -109,7 +109,7 @@
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="{{ url_for('grpo_detail', grpo_id=grpo.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <a href="{{ url_for('grn_detail', grn_id=grpo.id) }}" class="btn btn-sm btn-outline-primary">
                                                 <i data-feather="eye"></i> Review
                                             </a>
                                             <button class="btn btn-sm btn-success" onclick="showApprovalModal({{ grpo.id }}, '{{ grpo.po_number }}')">
@@ -128,7 +128,7 @@
                     {% else %}
                     <div class="alert alert-info">
                         <i data-feather="info"></i>
-                        No pending GRPO documents for approval at this time.
+                        No pending GRN documents for approval at this time.
                     </div>
                     {% endif %}
                 </div>
@@ -220,14 +220,14 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Approve GRPO</h5>
+                <h5 class="modal-title">Approve GRN</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="approvalForm" method="POST">
                 <div class="modal-body">
                     <div class="alert alert-success">
                         <i data-feather="check-circle"></i>
-                        Are you sure you want to approve GRPO for PO <strong id="approvalPONumber"></strong>?
+                        Are you sure you want to approve GRN for PO <strong id="approvalPONumber"></strong>?
                     </div>
                     <div class="mb-3">
                         <label for="approvalNotes" class="form-label">QC Notes (Optional)</label>
@@ -250,14 +250,14 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Reject GRPO</h5>
+                <h5 class="modal-title">Reject GRN</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="rejectionForm" method="POST">
                 <div class="modal-body">
                     <div class="alert alert-warning">
                         <i data-feather="alert-triangle"></i>
-                        Are you sure you want to reject GRPO for PO <strong id="rejectionPONumber"></strong>?
+                        Are you sure you want to reject GRN for PO <strong id="rejectionPONumber"></strong>?
                     </div>
                     <div class="mb-3">
                         <label for="rejectionNotes" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
@@ -268,7 +268,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-danger">
-                        <i data-feather="x"></i> Reject GRPO
+                        <i data-feather="x"></i> Reject GRN
                     </button>
                 </div>
             </form>

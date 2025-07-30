@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Edit GRPO Item{% endblock %}
+{% block title %}Edit GRN Item{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
@@ -9,8 +9,8 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('grpo') }}">GRPO</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('grpo_detail', grpo_id=grpo_doc.id) }}">{{ grpo_doc.po_number }}</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('grpo') }}">GRN</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('grn_detail', grn_id=grpo_doc.id) }}">{{ grpo_doc.po_number }}</a></li>
                     <li class="breadcrumb-item active">Edit Item</li>
                 </ol>
             </nav>
@@ -23,7 +23,7 @@
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i data-feather="edit-2"></i> 
-                        Edit GRPO Item - {{ grpo_item.item_code }}
+                        Edit GRN Item - {{ grpo_item.item_code }}
                     </h5>
                 </div>
                 <div class="card-body">
@@ -106,7 +106,7 @@
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <a href="{{ url_for('grpo_detail', grpo_id=grpo_doc.id) }}" class="btn btn-secondary">
+                            <a href="{{ url_for('grn_detail', grn_id=grpo_doc.id) }}" class="btn btn-secondary">
                                 <i data-feather="arrow-left"></i> Cancel
                             </a>
                             <button type="submit" class="btn btn-primary">
@@ -127,7 +127,7 @@
                     </h6>
                 </div>
                 <div class="card-body">
-                    <p><strong>GRPO Number:</strong> {{ grpo_doc.po_number }}</p>
+                    <p><strong>GRN Number:</strong> {{ grpo_doc.po_number }}</p>
                     <p><strong>Status:</strong> {{ grpo_doc.status.title() }}</p>
                     <p><strong>QC Status:</strong> 
                         {% if grpo_item.qc_status == 'pending' %}

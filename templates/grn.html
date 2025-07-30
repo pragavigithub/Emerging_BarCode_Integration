@@ -1,25 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}GRPO - WMS{% endblock %}
+{% block title %}GRN - WMS{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Goods Receipt PO (GRPO)</h1>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGRPOModal">
-                <i data-feather="plus"></i> Create GRPO
+            <h1>Goods Received Note (GRN) (GRN)</h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGRNModal">
+                <i data-feather="plus"></i> Create GRN
             </button>
         </div>
     </div>
 </div>
 
-<!-- GRPO Documents -->
+<!-- GRN Documents -->
 <div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">GRPO Documents</h5>
+                <h5 class="mb-0">GRN Documents</h5>
             </div>
             <div class="card-body">
                 {% if documents %}
@@ -27,7 +27,7 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>GRPO ID</th>
+                                <th>GRN ID</th>
                                 <th>PO Number</th>
                                 <th>Status</th>
                                 <th>SAP Document</th>
@@ -52,7 +52,7 @@
                                 <td>{{ doc.sap_document_number or 'N/A' }}</td>
                                 <td>{{ doc.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
-                                    <a href="{{ url_for('grpo_detail', grpo_id=doc.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <a href="{{ url_for('grn_detail', grn_id=doc.id) }}" class="btn btn-sm btn-outline-primary">
                                         <i data-feather="eye"></i> View
                                     </a>
                                 </td>
@@ -64,8 +64,8 @@
                 {% else %}
                 <div class="text-center py-4">
                     <i data-feather="package" style="width: 48px; height: 48px;" class="text-muted mb-3"></i>
-                    <h5>No GRPO Documents</h5>
-                    <p class="text-muted">Create your first GRPO document to get started.</p>
+                    <h5>No GRN Documents</h5>
+                    <p class="text-muted">Create your first GRN document to get started.</p>
                 </div>
                 {% endif %}
             </div>
@@ -73,12 +73,12 @@
     </div>
 </div>
 
-<!-- Create GRPO Modal -->
-<div class="modal fade" id="createGRPOModal" tabindex="-1" aria-labelledby="createGRPOModalLabel" aria-hidden="true">
+<!-- Create GRN Modal -->
+<div class="modal fade" id="createGRNModal" tabindex="-1" aria-labelledby="createGRNModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="createGRPOModalLabel">Create GRPO</h5>
+                <h5 class="modal-title" id="createGRNModalLabel">Create GRN</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="{{ url_for('create_grpo') }}">
@@ -102,7 +102,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create GRPO</button>
+                    <button type="submit" class="btn btn-primary">Create GRN</button>
                 </div>
             </form>
         </div>
@@ -171,7 +171,7 @@ document.getElementById('po_number').addEventListener('blur', function() {
 });
 
 // Clean up scanner when modal is closed
-document.getElementById('createGRPOModal').addEventListener('hidden.bs.modal', function () {
+document.getElementById('createGRNModal').addEventListener('hidden.bs.modal', function () {
     stopBarcodeScanner();
     document.getElementById('poScannerContainer').style.display = 'none';
 });

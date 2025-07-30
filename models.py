@@ -50,7 +50,7 @@ class User(UserMixin, db.Model):
         """Get default permissions based on role"""
         permissions = {
             'dashboard': True,
-            'grpo': False,
+            'grn': False,
             'inventory_transfer': False,
             'pick_list': False,
             'inventory_counting': False,
@@ -66,7 +66,7 @@ class User(UserMixin, db.Model):
                 permissions[key] = True
         elif self.role == 'manager':
             permissions.update({
-                'grpo': True,
+                'grn': True,
                 'inventory_transfer': True,
                 'pick_list': True,
                 'inventory_counting': True,
@@ -76,13 +76,13 @@ class User(UserMixin, db.Model):
             })
         elif self.role == 'qc':
             permissions.update({
-                'grpo': True,
+                'grn': True,
                 'qc_dashboard': True,
                 'bin_scanning': True
             })
         elif self.role == 'user':
             permissions.update({
-                'grpo': True,
+                'grn': True,
                 'inventory_transfer': True,
                 'pick_list': True,
                 'inventory_counting': True,
@@ -99,9 +99,9 @@ class User(UserMixin, db.Model):
         return self.get_permissions().get(screen, False)
 
     # Relationships
-    grpo_documents = relationship('GRPODocument',
+    grn_documents = relationship('GRNDocument',
                                   back_populates='user',
-                                  foreign_keys='GRPODocument.user_id')
+                                  foreign_keys='GRNDocument.user_id')
     inventory_transfers = relationship('InventoryTransfer',
                                        back_populates='user',
                                        foreign_keys='InventoryTransfer.user_id')
@@ -112,8 +112,8 @@ class User(UserMixin, db.Model):
     bin_scanning_logs = relationship('BinScanningLog', back_populates='user')
 
 
-class GRPODocument(db.Model):
-    __tablename__ = 'grpo_documents'
+class GRNDocument(db.Model):
+    __tablename__ = 'grn_documents'
 
     id = db.Column(db.Integer, primary_key=True)
     po_number = db.Column(db.String(20), nullable=False)
@@ -129,7 +129,7 @@ class GRPODocument(db.Model):
     qc_user_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                         nullable=True)  # QC approver
     qc_notes = db.Column(db.Text, nullable=True)
-    notes = db.Column(db.Text, nullable=True)  # General notes/comments for the GRPO
+    notes = db.Column(db.Text, nullable=True)  # General notes/comments for the GRN
     draft_or_post = db.Column(db.String(10), default='draft')  # draft, post
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime,
@@ -138,18 +138,18 @@ class GRPODocument(db.Model):
 
     # Relationships
     user = relationship('User',
-                        back_populates='grpo_documents',
+                        back_populates='grn_documents',
                         foreign_keys=[user_id])
     qc_user = relationship('User', foreign_keys=[qc_user_id])
-    items = relationship('GRPOItem', back_populates='grpo_document')
+    items = relationship('GRNItem', back_populates='grn_document')
 
 
-class GRPOItem(db.Model):
-    __tablename__ = 'grpo_items'
+class GRNItem(db.Model):
+    __tablename__ = 'grn_items'
 
     id = db.Column(db.Integer, primary_key=True)
-    grpo_document_id = db.Column(db.Integer,
-                              db.ForeignKey('grpo_documents.id'),
+    grn_document_id = db.Column(db.Integer,
+                              db.ForeignKey('grn_documents.id'),
                               nullable=False)
     po_line_number = db.Column(db.Integer, nullable=True)  # Line number from PO
     item_code = db.Column(db.String(50), nullable=False)
@@ -175,7 +175,7 @@ class GRPOItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
-    grpo_document = relationship('GRPODocument', back_populates='items')
+    grn_document = relationship('GRNDocument', back_populates='items')
 
 
 class InventoryTransfer(db.Model):

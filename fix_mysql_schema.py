@@ -170,25 +170,52 @@ def fix_mysql_schema():
             except Error as e:
                 print(f"⚠️ Error creating default branch: {e}")
             
-            print("📝 Adding missing columns to grpo_documents table...")
+            print("📝 Migrating GRPO to GRN tables and adding missing columns...")
             
-            # Add missing columns to grpo_documents table
-            missing_grpo_columns = [
+            # Migrate GRPO tables to GRN if they exist
+            try:
+                cursor.execute("SHOW TABLES LIKE 'grpo_documents'")
+                grpo_docs_exists = cursor.fetchone()
+                
+                if grpo_docs_exists:
+                    cursor.execute("RENAME TABLE grpo_documents TO grn_documents")
+                    print("✅ Renamed grpo_documents to grn_documents")
+                
+                cursor.execute("SHOW TABLES LIKE 'grpo_items'")
+                grpo_items_exists = cursor.fetchone()
+                
+                if grpo_items_exists:
+                    cursor.execute("RENAME TABLE grpo_items TO grn_items")
+                    cursor.execute("ALTER TABLE grn_items CHANGE COLUMN grpo_document_id grn_document_id INT NOT NULL")
+                    print("✅ Renamed grpo_items to grn_items and updated column names")
+                    
+            except Error as e:
+                print(f"⚠️ GRPO to GRN migration: {e}")
+            
+            # Add missing columns to grn_documents table
+            missing_grn_columns = [
                 "ADD COLUMN sap_document_number VARCHAR(50)",
                 "ADD COLUMN qc_user_id INT",
                 "ADD COLUMN qc_notes TEXT",
                 "ADD COLUMN draft_or_post VARCHAR(20) DEFAULT 'draft'"
             ]
             
-            for column_sql in missing_grpo_columns:
+            for column_sql in missing_grn_columns:
                 try:
-                    cursor.execute(f"ALTER TABLE grpo_documents {column_sql}")
-                    print(f"✅ Added GRPO column: {column_sql}")
+                    cursor.execute(f"ALTER TABLE grn_documents {column_sql}")
+                    print(f"✅ Added GRN column: {column_sql}")
                 except Error as e:
                     if "Duplicate column name" in str(e):
-                        print(f"✓ GRPO column already exists: {column_sql}")
+                        print(f"✓ GRN column already exists: {column_sql}")
                     else:
-                        print(f"⚠️ Error adding GRPO column {column_sql}: {e}")
+                        print(f"⚠️ Error adding GRN column {column_sql}: {e}")
+            
+            # Update document number series from GRPO to GRN
+            try:
+                cursor.execute("UPDATE document_number_series SET document_type = 'GRN', prefix = 'GRN-' WHERE document_type = 'GRPO'")
+                print("✅ Updated document series from GRPO to GRN")
+            except Error as e:
+                print(f"⚠️ Error updating document series: {e}")
             
             connection.commit()
             cursor.close()

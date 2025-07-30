@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}GRPO Detail - {{ grpo_doc.po_number }}{% endblock %}
+{% block title %}GRN Detail - {{ grpo_doc.po_number }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
@@ -9,14 +9,14 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ url_for('grpo') }}">GRPO</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('grpo') }}">GRN</a></li>
                     <li class="breadcrumb-item active">{{ grpo_doc.po_number }}</li>
                 </ol>
             </nav>
         </div>
     </div>
 
-    <!-- GRPO Header -->
+    <!-- GRN Header -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -24,7 +24,7 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             <i data-feather="package"></i> 
-                            Goods Receipt PO - {{ grpo_doc.po_number }}
+                            Goods Received Note (GRN) - {{ grpo_doc.po_number }}
                         </h5>
                         <div>
                             {% if grpo_doc.status == 'draft' %}
@@ -265,11 +265,11 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('grpo') }}" class="btn btn-secondary">
-                            <i data-feather="arrow-left"></i> Back to GRPO List
+                            <i data-feather="arrow-left"></i> Back to GRN List
                         </a>
                         <div>
                             {% if grpo_doc.status == 'draft' %}
-                            <button id="submitQCBtn" class="btn btn-success" onclick="submitGRPO({{ grpo_doc.id }})" {% if not grpo_doc.items %}disabled{% endif %}>
+                            <button id="submitQCBtn" class="btn btn-success" onclick="submitGRN({{ grpo_doc.id }})" {% if not grpo_doc.items %}disabled{% endif %}>
                                 <i data-feather="check"></i> Submit for QC Approval
                             </button>
                             {% if not grpo_doc.items %}
@@ -277,16 +277,16 @@
                             {% endif %}
                             {% elif grpo_doc.status == 'submitted' and current_user.role in ['qc', 'manager', 'admin'] %}
                             <div class="btn-group">
-                                <button class="btn btn-success" onclick="approveGRPO({{ grpo_doc.id }})">
+                                <button class="btn btn-success" onclick="approveGRN({{ grpo_doc.id }})">
                                     <i data-feather="check"></i> Approve & Post to SAP
                                 </button>
-                                <button class="btn btn-danger" onclick="rejectGRPO({{ grpo_doc.id }})">
+                                <button class="btn btn-danger" onclick="rejectGRN({{ grpo_doc.id }})">
                                     <i data-feather="x"></i> Reject
                                 </button>
                             </div>
                             {% elif grpo_doc.status == 'approved' and current_user.role in ['admin', 'manager'] %}
                             <div class="btn-group">
-                                <form method="POST" action="{{ url_for('post_grpo_to_sap_manual', grpo_id=grpo_doc.id) }}" style="display: inline;">
+                                <form method="POST" action="{{ url_for('post_grpo_to_sap_manual', grn_id=grpo_doc.id) }}" style="display: inline;">
                                     <button type="submit" class="btn btn-primary" id="postToSAPBtn" onclick="return postToSAPConfirm(this)">
                                         <i data-feather="upload"></i> Post to SAP B1
                                     </button>
@@ -309,10 +309,10 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add Item to GRPO</h5>
+                <h5 class="modal-title">Add Item to GRN</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="addItemForm" method="POST" action="{{ url_for('add_grpo_item', grpo_id=grpo_doc.id) }}">
+            <form id="addItemForm" method="POST" action="{{ url_for('add_grpo_item', grn_id=grpo_doc.id) }}">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="item_code" class="form-label">Item Code <span class="text-danger">*</span></label>
@@ -420,8 +420,8 @@ function updateField(element) {
     });
 }
 
-// Add item to GRPO function
-function addItemToGRPO(itemCode, itemName, uom, warehouseCode, poItemData) {
+// Add item to GRN function
+function addItemToGRN(itemCode, itemName, uom, warehouseCode, poItemData) {
     selectedPoItemData = {
         itemCode: itemCode,
         itemName: itemName || 'N/A',
@@ -496,7 +496,7 @@ function generateQRLabel(itemCode, itemName, batchNumber, grpoId, poNumber) {
         item_code: itemCode,
         item_name: itemName,
         batch_number: batchNumber,
-        grpo_id: grpoId,
+        grn_id: grpoId,
         po_number: poNumber
     };
     
@@ -606,14 +606,14 @@ function printQRLabel() {
     window.print();
 }
 
-// GRPO submission functions
-function submitGRPO(grpoId) {
+// GRN submission functions
+function submitGRN(grpoId) {
     const submitBtn = document.getElementById('submitQCBtn');
     if (submitBtn && submitBtn.disabled) {
         return;
     }
     
-    if (confirm('Submit this GRPO for QC approval?')) {
+    if (confirm('Submit this GRN for QC approval?')) {
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i data-feather="loader"></i> Submitting...';
@@ -639,7 +639,7 @@ function submitGRPO(grpoId) {
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error submitting GRPO');
+            alert('Error submitting GRN');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i data-feather="check"></i> Submit for QC Approval';
@@ -648,13 +648,13 @@ function submitGRPO(grpoId) {
     }
 }
 
-function approveGRPO(grpoId) {
+function approveGRN(grpoId) {
     const approveBtn = event.target;
     if (approveBtn.disabled) {
         return;
     }
     
-    if (confirm('Approve this GRPO and post to SAP B1?')) {
+    if (confirm('Approve this GRN and post to SAP B1?')) {
         approveBtn.disabled = true;
         approveBtn.innerHTML = '<i data-feather="loader"></i> Posting to SAP B1...';
         
@@ -685,16 +685,16 @@ function approveGRPO(grpoId) {
             }
         })
         .catch(error => {
-            console.error('Error approving GRPO:', error);
-            alert('Error approving GRPO: ' + error.message);
+            console.error('Error approving GRN:', error);
+            alert('Error approving GRN: ' + error.message);
             approveBtn.disabled = false;
             approveBtn.innerHTML = '<i data-feather="check"></i> Approve & Post to SAP';
         });
     }
 }
 
-function rejectGRPO(grpoId) {
-    if (confirm('Reject this GRPO?')) {
+function rejectGRN(grpoId) {
+    if (confirm('Reject this GRN?')) {
         fetch('/grpo/' + grpoId + '/reject', {
             method: 'POST',
             headers: {
@@ -712,15 +712,15 @@ function rejectGRPO(grpoId) {
         })
         .then(data => {
             if (data.success) {
-                alert('GRPO rejected successfully');
+                alert('GRN rejected successfully');
                 location.reload();
             } else {
                 alert('Error: ' + data.error);
             }
         })
         .catch(error => {
-            console.error('Error rejecting GRPO:', error);
-            alert('Error rejecting GRPO: ' + error.message);
+            console.error('Error rejecting GRN:', error);
+            alert('Error rejecting GRN: ' + error.message);
         });
     }
 }
@@ -748,7 +748,7 @@ function postToSAPConfirm(button) {
         return false;
     }
     
-    if (confirm('Post this GRPO to SAP B1 as Purchase Delivery Note?')) {
+    if (confirm('Post this GRN to SAP B1 as Purchase Delivery Note?')) {
         button.disabled = true;
         button.innerHTML = '<i data-feather="loader"></i> Posting...';
         return true;
@@ -773,7 +773,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.warn('Could not parse PO item data:', e);
             }
             
-            addItemToGRPO(itemCode, itemName, uom, warehouse, poItemData);
+            addItemToGRN(itemCode, itemName, uom, warehouse, poItemData);
         });
     });
 });

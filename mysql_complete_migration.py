@@ -135,7 +135,7 @@ def create_tables(host, port, user, password, database):
             
             # Create all other tables...
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS grpo_documents (
+                CREATE TABLE IF NOT EXISTS grn_documents (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     po_number VARCHAR(20) NOT NULL,
                     sap_document_number VARCHAR(50),
@@ -158,12 +158,12 @@ def create_tables(host, port, user, password, database):
                     INDEX idx_user (user_id)
                 )
             """)
-            print("✅ GRPO Documents table created")
+            print("✅ GRN Documents table created")
             
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS grpo_items (
+                CREATE TABLE IF NOT EXISTS grn_items (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    grpo_document_id INT NOT NULL,
+                    grn_document_id INT NOT NULL,
                     item_code VARCHAR(50) NOT NULL,
                     item_name VARCHAR(200) NOT NULL,
                     ordered_quantity DECIMAL(10,3) NOT NULL,
@@ -175,13 +175,13 @@ def create_tables(host, port, user, password, database):
                     expiration_date DATE,
                     barcode VARCHAR(100),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (grpo_document_id) REFERENCES grpo_documents(id) ON DELETE CASCADE,
-                    INDEX idx_grpo_doc (grpo_document_id),
+                    FOREIGN KEY (grn_document_id) REFERENCES grn_documents(id) ON DELETE CASCADE,
+                    INDEX idx_grn_doc (grn_document_id),
                     INDEX idx_item_code (item_code),
                     INDEX idx_batch (batch_number)
                 )
             """)
-            print("✅ GRPO Items table created")
+            print("✅ GRN Items table created")
             
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS inventory_transfers (
@@ -440,7 +440,7 @@ def create_tables(host, port, user, password, database):
             cursor.execute("""
                 INSERT IGNORE INTO document_number_series (document_type, prefix, current_number, year_suffix)
                 VALUES 
-                ('GRPO', 'GRPO-', 1, TRUE),
+                ('GRN', 'GRN-', 1, TRUE),
                 ('TRANSFER', 'TR-', 1, TRUE),
                 ('PICKLIST', 'PL-', 1, TRUE)
             """)

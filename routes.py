@@ -6,7 +6,7 @@ import logging
 import json
 
 from app import app, db, login_manager
-from models import User, GRPODocument, GRPOItem, InventoryTransfer, InventoryTransferItem, PickList, PickListItem, InventoryCount, InventoryCountItem, BarcodeLabel, BinScanningLog, DocumentNumberSeries
+from models import User, GRNDocument, GRNItem, InventoryTransfer, InventoryTransferItem, PickList, PickListItem, InventoryCount, InventoryCountItem, BarcodeLabel, BinScanningLog, DocumentNumberSeries
 from sap_integration import SAPIntegration
 
 # BinScanningLog is now imported above
@@ -74,13 +74,13 @@ def logout():
 def dashboard():
     try:
         # Get dashboard statistics
-        grpo_count = GRPODocument.query.filter_by(user_id=current_user.id).count()
+        grn_count = GRNDocument.query.filter_by(user_id=current_user.id).count()
         transfer_count = InventoryTransfer.query.filter_by(user_id=current_user.id).count()
         pick_list_count = PickList.query.filter_by(user_id=current_user.id).count()
         count_tasks = InventoryCount.query.filter_by(user_id=current_user.id).count()
         
         stats = {
-            'grpo_count': grpo_count,
+            'grn_count': grn_count,
             'transfer_count': transfer_count,
             'pick_list_count': pick_list_count,
             'count_tasks': count_tasks
@@ -89,7 +89,7 @@ def dashboard():
         logging.error(f"Database error in dashboard: {e}")
         # Handle database schema mismatch gracefully
         stats = {
-            'grpo_count': 0,
+            'grn_count': 0,
             'transfer_count': 0,
             'pick_list_count': 0,
             'count_tasks': 0
@@ -98,30 +98,30 @@ def dashboard():
     
     return render_template('dashboard.html', stats=stats)
 
-@app.route('/grpo')
+@app.route('/grn')
 @login_required
-def grpo():
+def grn():
     # Screen-level authorization check
-    if not current_user.has_permission('grpo'):
-        flash('Access denied. You do not have permission to access GRPO screen.', 'error')
+    if not current_user.has_permission('grn'):
+        flash('Access denied. You do not have permission to access GRN screen.', 'error')
         return redirect(url_for('dashboard'))
     
     try:
-        documents = GRPODocument.query.filter_by(user_id=current_user.id).order_by(GRPODocument.created_at.desc()).all()
+        documents = GRNDocument.query.filter_by(user_id=current_user.id).order_by(GRNDocument.created_at.desc()).all()
     except Exception as e:
-        logging.error(f"Database error in grpo: {e}")
+        logging.error(f"Database error in grn: {e}")
         documents = []
-        flash('Database needs to be updated. Please run: python migrate_database.py', 'warning')
-    return render_template('grpo.html', documents=documents)
+        flash('Database needs to be updated. Please run: python complete_mysql_fix.py', 'warning')
+    return render_template('grn.html', documents=documents)
 
-@app.route('/grpo/create', methods=['POST'])
+@app.route('/grn/create', methods=['POST'])
 @login_required
-def create_grpo():
+def create_grn():
     po_number = request.form['po_number']
     
-    # BUSINESS LOGIC CHANGE: Allow multiple GRPOs per PO
-    # Each PO should create a NEW GRPO every time (user requirement)
-    # Skip the existing GRPO check to allow multiple GRPOs per PO
+    # BUSINESS LOGIC CHANGE: Allow multiple GRNs per PO
+    # Each PO should create a NEW GRN every time (user requirement)
+    # Skip the existing GRN check to allow multiple GRNs per PO
     
     # Check if PO exists in SAP
     sap = SAPIntegration()
@@ -129,7 +129,7 @@ def create_grpo():
     
     if not po_data:
         flash('Purchase Order not found in SAP B1.', 'error')
-        return redirect(url_for('grpo'))
+        return redirect(url_for('grn'))
     
     # Check if PO has open lines
     document_lines = po_data.get('DocumentLines', [])
@@ -163,7 +163,7 @@ def create_grpo():
             flash('Purchase Order has no open lines available for receipt. All lines are either closed or fully received.', 'error')
         else:
             flash('Purchase Order has no line items.', 'error')
-        return redirect(url_for('grpo'))
+        return redirect(url_for('grn'))
     
     # Parse SAP date safely (handles both ISO format and simple date format)
     po_date = datetime.utcnow()
@@ -180,13 +180,13 @@ def create_grpo():
             logging.warning(f"Could not parse PO date '{date_str}': {e}")
             po_date = datetime.utcnow()
 
-    # Generate GRPO document number using document series
-    grpo_number = DocumentNumberSeries.get_next_number('GRPO')
+    # Generate GRN document number using document series
+    grn_number = DocumentNumberSeries.get_next_number('GRN')
     
-    # Create GRPO document with PO details and generated document number
-    grpo_doc = GRPODocument(
+    # Create GRN document with PO details and generated document number
+    grn_doc = GRNDocument(
         po_number=po_number,
-        sap_document_number=grpo_number,  # Use generated GRPO number
+        sap_document_number=grn_number,  # Use generated GRN number
         supplier_code=po_data.get('CardCode'),
         supplier_name=po_data.get('CardName'),
         po_date=po_date,
@@ -194,27 +194,27 @@ def create_grpo():
         user_id=current_user.id,
         draft_or_post=request.form.get('draft_or_post', 'draft')
     )
-    db.session.add(grpo_doc)
+    db.session.add(grn_doc)
     db.session.commit()
     
-    flash(f'GRPO created successfully for PO {po_number}!', 'success')
-    return redirect(url_for('grpo_detail', grpo_id=grpo_doc.id))
+    flash(f'GRN created successfully for PO {po_number}!', 'success')
+    return redirect(url_for('grn_detail', grn_id=grn_doc.id))
 
-@app.route('/grpo/<int:grpo_id>')
+@app.route('/grn/<int:grn_id>')
 @login_required
-def grpo_detail(grpo_id):
+def grn_detail(grn_id):
     try:
-        grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+        grn_doc = GRNDocument.query.get_or_404(grn_id)
         
         # Get PO items from SAP
         sap = SAPIntegration()
-        po_items = sap.get_purchase_order_items(grpo_doc.po_number)
+        po_items = sap.get_purchase_order_items(grn_doc.po_number)
     except Exception as e:
-        logging.error(f"Database error in grpo_detail: {e}")
+        logging.error(f"Database error in grn_detail: {e}")
         flash('Database needs to be updated. Please run: python reset_database.py', 'error')
-        return redirect(url_for('grpo'))
+        return redirect(url_for('grn'))
     
-    return render_template('grpo_detail.html', grpo_doc=grpo_doc, po_items=po_items)
+    return render_template('grn_detail.html', grn_doc=grn_doc, po_items=po_items)
 
 @app.route('/api/batch-numbers/<item_code>')
 @login_required
@@ -231,13 +231,13 @@ def get_batch_numbers(item_code):
 @app.route('/api/generate-qr-label', methods=['POST'])
 @login_required
 def generate_qr_label():
-    """Generate QR code label for GRPO item"""
+    """Generate QR code label for GRN item"""
     try:
         data = request.get_json()
         item_code = data.get('item_code')
         item_name = data.get('item_name', '')
         batch_number = data.get('batch_number', '')
-        grpo_id = data.get('grpo_id')
+        grn_id = data.get('grn_id')
         po_number = data.get('po_number', '')
         
         if not item_code:
@@ -255,7 +255,7 @@ def generate_qr_label():
                 'po_number': po_number,
                 'item_name': item_name,
                 'batch_number': batch_number,
-                'grpo_id': grpo_id
+                'grn_id': grn_id
             }
         })
         
@@ -278,7 +278,7 @@ def generate_transfer_qr_label():
         if not item_code:
             return jsonify({'success': False, 'error': 'Item code is required'}), 400
         
-        # Generate simple QR code data format for easy scanning (same as GRPO format)
+        # Generate simple QR code data format for easy scanning (same as GRN format)
         # Format: ItemCode|TransferNumber|ItemName|BatchNumber
         qr_string = f"{item_code}|{transfer_number}|{item_name}|{batch_number or 'N/A'}"
         
@@ -298,15 +298,15 @@ def generate_transfer_qr_label():
         logging.error(f"Error generating transfer QR label: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/grpo/<int:grpo_id>/add_item', methods=['POST'])
+@app.route('/grn/<int:grn_id>/add_item', methods=['POST'])
 @login_required
-def add_grpo_item(grpo_id):
+def add_grn_item(grn_id):
     try:
-        grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+        grn_doc = GRNDocument.query.get_or_404(grn_id)
     except Exception as e:
-        logging.error(f"Database error in add_grpo_item: {e}")
+        logging.error(f"Database error in add_grn_item: {e}")
         flash('Database needs to be updated. Please run: python reset_database.py', 'error')
-        return redirect(url_for('grpo'))
+        return redirect(url_for('grn'))
     
     item_code = request.form['item_code']
     quantity = float(request.form['quantity'])
@@ -317,7 +317,7 @@ def add_grpo_item(grpo_id):
     
     # Get PO line item details if available
     sap = SAPIntegration()
-    po_items = sap.get_purchase_order_items(grpo_doc.po_number)
+    po_items = sap.get_purchase_order_items(grn_doc.po_number)
     
     # Find matching PO line item
     po_line_item = None
@@ -331,21 +331,21 @@ def add_grpo_item(grpo_id):
         po_quantity = po_line_item.get('Quantity', 0)
         open_quantity = po_line_item.get('OpenQuantity', po_quantity)
         
-        # Get already received quantity for this item in this GRPO and other GRPOs
-        existing_received = db.session.query(db.func.sum(GRPOItem.received_quantity)).filter(
-            GRPOItem.item_code == item_code,
-            GRPOItem.grpo_document_id == grpo_doc.id
+        # Get already received quantity for this item in this GRN and other GRNs
+        existing_received = db.session.query(db.func.sum(GRNItem.received_quantity)).filter(
+            GRNItem.item_code == item_code,
+            GRNItem.grn_document_id == grn_doc.id
         ).scalar() or 0
         
         # VALIDATION 1: Cannot exceed PO order quantity
         if (existing_received + quantity) > po_quantity:
             flash(f'Error: Total received quantity ({existing_received + quantity}) cannot exceed PO order quantity ({po_quantity}) for item {item_code}', 'error')
-            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+            return redirect(url_for('grn_detail', grn_id=grn_id))
         
         # VALIDATION 2: Cannot exceed open quantity (available to receive)
         if quantity > open_quantity:
             flash(f'Error: Received quantity ({quantity}) cannot exceed open quantity ({open_quantity}) for item {item_code}', 'error')
-            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+            return redirect(url_for('grn_detail', grn_id=grn_id))
         
         logging.info(f"✅ Quantity validation passed for {item_code}: Received={quantity}, Open={open_quantity}, PO Total={po_quantity}")
     
@@ -356,9 +356,9 @@ def add_grpo_item(grpo_id):
         random_suffix = secrets.token_hex(4).upper()
         generated_barcode = f"WMS-{item_code}-{random_suffix}"
     
-    # Create GRPO item with enhanced details
-    grpo_item = GRPOItem(
-        grpo_document_id=grpo_doc.id,
+    # Create GRN item with enhanced details
+    grn_item = GRNItem(
+        grn_document_id=grn_doc.id,
         po_line_number=po_line_item.get('LineNum') if po_line_item else None,
         item_code=item_code,
         item_name=request.form['item_name'],
@@ -374,54 +374,54 @@ def add_grpo_item(grpo_id):
         supplier_barcode=request.form.get('barcode'),
         generated_barcode=generated_barcode
     )
-    db.session.add(grpo_item)
+    db.session.add(grn_item)
     db.session.commit()
     
-    flash('Item added to GRPO successfully!', 'success')
-    return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    flash('Item added to GRN successfully!', 'success')
+    return redirect(url_for('grn_detail', grn_id=grn_id))
 
-@app.route('/grpo/<int:grpo_id>/submit', methods=['POST'])
+@app.route('/grn/<int:grn_id>/submit', methods=['POST'])
 @login_required
-def submit_grpo(grpo_id):
-    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+def submit_grn(grn_id):
+    grn_doc = GRNDocument.query.get_or_404(grn_id)
     
-    # Check if GRPO has items
-    if not grpo_doc.items:
-        message = 'Cannot submit GRPO without items'
+    # Check if GRN has items
+    if not grn_doc.items:
+        message = 'Cannot submit GRN without items'
         if request.headers.get('Content-Type') == 'application/json' or request.is_json:
             return jsonify({'success': False, 'error': message}), 400
         flash(message, 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        return redirect(url_for('grn_detail', grn_id=grn_id))
     
     # Update status to submitted for QC approval
-    grpo_doc.status = 'submitted'
+    grn_doc.status = 'submitted'
     db.session.commit()
     
-    message = 'GRPO submitted for QC approval!'
+    message = 'GRN submitted for QC approval!'
     if request.headers.get('Content-Type') == 'application/json' or request.is_json:
         return jsonify({'success': True, 'message': message})
     
     flash(message, 'success')
-    return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    return redirect(url_for('grn_detail', grn_id=grn_id))
 
-@app.route('/grpo/<int:grpo_id>/approve', methods=['POST'])
+@app.route('/grn/<int:grn_id>/approve', methods=['POST'])
 @login_required
-def approve_grpo(grpo_id):
-    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+def approve_grn(grn_id):
+    grn_doc = GRNDocument.query.get_or_404(grn_id)
     
     # Check if user has QC role
     if current_user.role not in ['qc', 'manager', 'admin']:
         if request.headers.get('Content-Type') == 'application/json' or request.is_json:
-            return jsonify({'success': False, 'error': 'You do not have permission to approve GRPO documents.'}), 403
-        flash('You do not have permission to approve GRPO documents.', 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+            return jsonify({'success': False, 'error': 'You do not have permission to approve GRN documents.'}), 403
+        flash('You do not have permission to approve GRN documents.', 'error')
+        return redirect(url_for('grn_detail', grn_id=grn_id))
     
-    # Check if GRPO is in submitted status
-    if grpo_doc.status != 'submitted':
+    # Check if GRN is in submitted status
+    if grn_doc.status != 'submitted':
         if request.headers.get('Content-Type') == 'application/json' or request.is_json:
-            return jsonify({'success': False, 'error': 'Only submitted GRPOs can be approved.'}), 400
-        flash('Only submitted GRPOs can be approved.', 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+            return jsonify({'success': False, 'error': 'Only submitted GRNs can be approved.'}), 400
+        flash('Only submitted GRNs can be approved.', 'error')
+        return redirect(url_for('grn_detail', grn_id=grn_id))
     
     try:
         # Get draft or post preference from form or JSON
@@ -433,37 +433,37 @@ def approve_grpo(grpo_id):
             draft_or_post = request.form.get('draft_or_post', 'post')
             qc_notes = request.form.get('qc_notes', '')
         
-        grpo_doc.draft_or_post = draft_or_post
-        grpo_doc.qc_user_id = current_user.id
-        grpo_doc.qc_notes = qc_notes
+        grn_doc.draft_or_post = draft_or_post
+        grn_doc.qc_user_id = current_user.id
+        grn_doc.qc_notes = qc_notes
         
         # Update all items QC status first
-        for item in grpo_doc.items:
+        for item in grn_doc.items:
             item.qc_status = 'approved'
         
         # Always post to SAP B1 when using approve button
         logging.info("=" * 100)
-        logging.info("🚀 POSTING GRPO TO SAP B1 - PURCHASE DELIVERY NOTE CREATION")
+        logging.info("🚀 POSTING GRN TO SAP B1 - PURCHASE DELIVERY NOTE CREATION")
         logging.info("=" * 100)
-        logging.info(f"📋 GRPO ID: {grpo_doc.id}")
-        logging.info(f"📄 PO Number: {grpo_doc.po_number}")
+        logging.info(f"📋 GRN ID: {grn_doc.id}")
+        logging.info(f"📄 PO Number: {grn_doc.po_number}")
         logging.info(f"👤 User: {current_user.username}")
         logging.info(f"🏢 Branch: {current_user.branch_id}")
         
         sap = SAPIntegration()
-        result = sap.post_grpo_to_sap(grpo_doc)
+        result = sap.post_grn_to_sap(grn_doc)
         
         if result.get('success'):
-            grpo_doc.status = 'posted'
-            grpo_doc.sap_document_number = result.get('sap_document_number')
+            grn_doc.status = 'posted'
+            grn_doc.sap_document_number = result.get('sap_document_number')
             db.session.commit()
             
             logging.info("=" * 100)
-            logging.info("✅ SUCCESS: GRPO POSTED TO SAP B1")
+            logging.info("✅ SUCCESS: GRN POSTED TO SAP B1")
             logging.info(f"📄 SAP Document Number: {result.get('sap_document_number')}")
             logging.info("=" * 100)
             
-            success_message = f'GRPO approved and posted to SAP B1 successfully! SAP Document Number: {result.get("sap_document_number")}'
+            success_message = f'GRN approved and posted to SAP B1 successfully! SAP Document Number: {result.get("sap_document_number")}'
             
             if request.headers.get('Content-Type') == 'application/json' or request.is_json:
                 return jsonify({
@@ -473,44 +473,44 @@ def approve_grpo(grpo_id):
                 })
             flash(success_message, 'success')
         else:
-            grpo_doc.status = 'approved'  # Keep as approved even if SAP posting fails
+            grn_doc.status = 'approved'  # Keep as approved even if SAP posting fails
             db.session.commit()
             
             logging.error("=" * 100)
-            logging.error("❌ FAILED: GRPO POSTING TO SAP B1 FAILED")
+            logging.error("❌ FAILED: GRN POSTING TO SAP B1 FAILED")
             logging.error(f"🚫 Error: {result.get('error')}")
             logging.error("=" * 100)
             
-            error_message = f'GRPO approved but failed to post to SAP B1: {result.get("error")}'
+            error_message = f'GRN approved but failed to post to SAP B1: {result.get("error")}'
             
             if request.headers.get('Content-Type') == 'application/json' or request.is_json:
                 return jsonify({
                     'success': False,
                     'error': error_message,
-                    'grpo_approved': True
+                    'grn_approved': True
                 })
             flash(error_message, 'warning')
     
     except Exception as e:
-        logging.error(f"Error approving GRPO: {str(e)}")
+        logging.error(f"Error approving GRN: {str(e)}")
         if request.headers.get('Content-Type') == 'application/json' or request.is_json:
-            return jsonify({'success': False, 'error': f'Error approving GRPO: {str(e)}'}), 500
-        flash(f'Error approving GRPO: {str(e)}', 'error')
+            return jsonify({'success': False, 'error': f'Error approving GRN: {str(e)}'}), 500
+        flash(f'Error approving GRN: {str(e)}', 'error')
     
-    return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    return redirect(url_for('grn_detail', grn_id=grn_id))
 
-@app.route('/grpo/<int:grpo_id>/reject', methods=['POST'])
+@app.route('/grn/<int:grn_id>/reject', methods=['POST'])
 @login_required
-def reject_grpo(grpo_id):
-    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+def reject_grn(grn_id):
+    grn_doc = GRNDocument.query.get_or_404(grn_id)
     
     # Check if user has QC role
     if current_user.role not in ['qc', 'manager', 'admin']:
-        message = 'You do not have permission to reject GRPO documents.'
+        message = 'You do not have permission to reject GRN documents.'
         if request.headers.get('Content-Type') == 'application/json' or request.is_json:
             return jsonify({'success': False, 'error': message}), 403
         flash(message, 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        return redirect(url_for('grn_detail', grn_id=grn_id))
     
     # Get QC notes from form or JSON
     if request.is_json:
@@ -519,89 +519,89 @@ def reject_grpo(grpo_id):
     else:
         qc_notes = request.form.get('qc_notes', '')
     
-    grpo_doc.status = 'rejected'
-    grpo_doc.qc_user_id = current_user.id
-    grpo_doc.qc_notes = qc_notes
+    grn_doc.status = 'rejected'
+    grn_doc.qc_user_id = current_user.id
+    grn_doc.qc_notes = qc_notes
     
     # Update all items QC status
-    for item in grpo_doc.items:
+    for item in grn_doc.items:
         item.qc_status = 'rejected'
         item.qc_notes = qc_notes
     
     db.session.commit()
     
-    message = 'GRPO rejected!'
+    message = 'GRN rejected!'
     if request.headers.get('Content-Type') == 'application/json' or request.is_json:
         return jsonify({'success': True, 'message': message})
     
     flash(message, 'warning')
-    return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    return redirect(url_for('grn_detail', grn_id=grn_id))
 
-@app.route('/grpo/<int:grpo_id>/item/<int:item_id>/edit', methods=['GET', 'POST'])
+@app.route('/grn/<int:grn_id>/item/<int:item_id>/edit', methods=['GET', 'POST'])
 @login_required
-def edit_grpo_item(grpo_id, item_id):
-    grpo_doc = GRPODocument.query.get_or_404(grpo_id)
-    grpo_item = GRPOItem.query.get_or_404(item_id)
+def edit_grn_item(grn_id, item_id):
+    grn_doc = GRNDocument.query.get_or_404(grn_id)
+    grn_item = GRNItem.query.get_or_404(item_id)
     
     # Check if user has permission to edit
-    if grpo_doc.user_id != current_user.id and current_user.role not in ['manager', 'admin']:
+    if grn_doc.user_id != current_user.id and current_user.role not in ['manager', 'admin']:
         flash('You do not have permission to edit this item.', 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        return redirect(url_for('grn_detail', grn_id=grn_id))
     
-    # Check if GRPO is still editable
-    if grpo_doc.status not in ['draft', 'rejected']:
-        flash('Cannot edit items in approved or posted GRPO.', 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+    # Check if GRN is still editable
+    if grn_doc.status not in ['draft', 'rejected']:
+        flash('Cannot edit items in approved or posted GRN.', 'error')
+        return redirect(url_for('grn_detail', grn_id=grn_id))
     
     if request.method == 'POST':
         # Update only the received quantity
-        new_quantity = float(request.form.get('received_quantity', grpo_item.received_quantity))
-        grpo_item.received_quantity = new_quantity
+        new_quantity = float(request.form.get('received_quantity', grn_item.received_quantity))
+        grn_item.received_quantity = new_quantity
         
         # Update any other allowed fields
         if request.form.get('bin_location'):
-            grpo_item.bin_location = request.form.get('bin_location')
+            grn_item.bin_location = request.form.get('bin_location')
         if request.form.get('batch_number'):
-            grpo_item.batch_number = request.form.get('batch_number')
+            grn_item.batch_number = request.form.get('batch_number')
         if request.form.get('expiration_date'):
-            grpo_item.expiration_date = datetime.strptime(request.form.get('expiration_date'), '%Y-%m-%d')
+            grn_item.expiration_date = datetime.strptime(request.form.get('expiration_date'), '%Y-%m-%d')
         
         db.session.commit()
         flash('Item updated successfully!', 'success')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        return redirect(url_for('grn_detail', grn_id=grn_id))
     
-    return render_template('edit_grpo_item.html', grpo_doc=grpo_doc, grpo_item=grpo_item)
+    return render_template('edit_grn_item.html', grn_doc=grn_doc, grn_item=grn_item)
 
-@app.route('/grpo/item/<int:item_id>/update_field', methods=['POST'])
+@app.route('/grn/item/<int:item_id>/update_field', methods=['POST'])
 @login_required
-def update_grpo_item_field(item_id):
-    """Update a single field of a GRPO item via AJAX"""
-    grpo_item = GRPOItem.query.get_or_404(item_id)
-    grpo_doc = grpo_item.grpo_document
+def update_grn_item_field(item_id):
+    """Update a single field of a GRN item via AJAX"""
+    grn_item = GRNItem.query.get_or_404(item_id)
+    grn_doc = grn_item.grn_document
     
     # Check permissions
-    if grpo_doc.user_id != current_user.id and current_user.role not in ['manager', 'admin']:
+    if grn_doc.user_id != current_user.id and current_user.role not in ['manager', 'admin']:
         return jsonify({'success': False, 'error': 'Permission denied'}), 403
     
     # Check if editable
-    if grpo_doc.status not in ['draft', 'rejected']:
-        return jsonify({'success': False, 'error': 'Cannot edit approved or posted GRPO'}), 400
+    if grn_doc.status not in ['draft', 'rejected']:
+        return jsonify({'success': False, 'error': 'Cannot edit approved or posted GRN'}), 400
     
     try:
         field_name = request.json.get('field_name')
         field_value = request.json.get('field_value')
         
         if field_name == 'received_quantity':
-            grpo_item.received_quantity = float(field_value) if field_value else 0
+            grn_item.received_quantity = float(field_value) if field_value else 0
         elif field_name == 'batch_number':
-            grpo_item.batch_number = field_value if field_value else None
+            grn_item.batch_number = field_value if field_value else None
         elif field_name == 'expiration_date':
             if field_value:
-                grpo_item.expiration_date = datetime.strptime(field_value, '%Y-%m-%d')
+                grn_item.expiration_date = datetime.strptime(field_value, '%Y-%m-%d')
             else:
-                grpo_item.expiration_date = None
+                grn_item.expiration_date = None
         elif field_name == 'generated_barcode':
-            grpo_item.generated_barcode = field_value if field_value else None
+            grn_item.generated_barcode = field_value if field_value else None
         else:
             return jsonify({'success': False, 'error': 'Invalid field name'}), 400
         
@@ -610,7 +610,7 @@ def update_grpo_item_field(item_id):
         
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Error updating GRPO item field: {str(e)}")
+        logging.error(f"Error updating GRN item field: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/inventory_transfer')
@@ -1006,7 +1006,7 @@ def reopen_transfer_additional(transfer_id):
 @app.route('/qc_dashboard')
 @login_required
 def qc_dashboard():
-    """QC Dashboard for approving transfers and GRPOs"""
+    """QC Dashboard for approving transfers and GRNs"""
     # Check QC permissions
     if not current_user.has_permission('qc_dashboard') and current_user.role not in ['admin', 'manager']:
         flash('Access denied - QC permissions required', 'error')
@@ -1015,12 +1015,12 @@ def qc_dashboard():
     # Get pending transfers for QC approval
     pending_transfers = InventoryTransfer.query.filter_by(status='submitted').order_by(InventoryTransfer.created_at.desc()).all()
     
-    # Get pending GRPOs for QC approval
-    pending_grpos = GRPODocument.query.filter_by(status='submitted').order_by(GRPODocument.created_at.desc()).all()
+    # Get pending GRNs for QC approval
+    pending_grns = GRNDocument.query.filter_by(status='submitted').order_by(GRNDocument.created_at.desc()).all()
     
     return render_template('qc_dashboard.html', 
                          pending_transfers=pending_transfers,
-                         pending_grpos=pending_grpos)
+                         pending_grns=pending_grns)
 
 @app.route('/pick_list')
 @login_required
@@ -1325,7 +1325,7 @@ def generate_barcode_api():
     
     return jsonify({'success': True, 'barcode': barcode})
 
-# Duplicate route removed - using existing update_grpo_item_field function
+# Duplicate route removed - using existing update_grn_item_field function
 
 @app.route('/user_management')
 @login_required
@@ -1377,7 +1377,7 @@ def create_user():
     
     # Set custom permissions if provided
     permissions = {}
-    for screen in ['dashboard', 'grpo', 'inventory_transfer', 'pick_list', 'inventory_counting', 
+    for screen in ['dashboard', 'grn', 'inventory_transfer', 'pick_list', 'inventory_counting', 
                    'bin_scanning', 'label_printing', 'user_management', 'qc_dashboard']:
         permissions[screen] = screen in request.form
     
@@ -1409,7 +1409,7 @@ def edit_user(user_id):
         
         # Update permissions
         permissions = {}
-        for screen in ['dashboard', 'grpo', 'inventory_transfer', 'pick_list', 'inventory_counting', 
+        for screen in ['dashboard', 'grn', 'inventory_transfer', 'pick_list', 'inventory_counting', 
                        'bin_scanning', 'label_printing', 'user_management', 'qc_dashboard']:
             permissions[screen] = screen in request.form
         
@@ -1565,7 +1565,7 @@ def get_bins():
     
     return jsonify({'bins': bins})
 
-# Enhanced GRPO API routes
+# Enhanced GRN API routes
 
 @app.route('/api/scan_po', methods=['POST'])
 @login_required
@@ -1626,11 +1626,11 @@ def print_barcode_api():
         if not barcode:
             return jsonify({'error': 'barcode is required'}), 400
         
-        # Update GRPO item print status if item_id provided
+        # Update GRN item print status if item_id provided
         if item_id:
-            grpo_item = GRPOItem.query.get(item_id)
-            if grpo_item and grpo_item.generated_barcode == barcode:
-                grpo_item.barcode_printed = True
+            grn_item = GRNItem.query.get(item_id)
+            if grn_item and grn_item.generated_barcode == barcode:
+                grn_item.barcode_printed = True
                 db.session.commit()
         
         # Update barcode label print count
@@ -1652,59 +1652,59 @@ def print_barcode_api():
         logging.error(f"Error printing barcode: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/post_grpo_to_sap/<int:grpo_id>', methods=['POST'])
+@app.route('/post_grn_to_sap/<int:grn_id>', methods=['POST'])
 @login_required
-def post_grpo_to_sap_manual(grpo_id):
-    """Manually post approved GRPO to SAP B1"""
+def post_grn_to_sap_manual(grn_id):
+    """Manually post approved GRN to SAP B1"""
     try:
-        # Get GRPO document
-        grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+        # Get GRN document
+        grn_doc = GRNDocument.query.get_or_404(grn_id)
         
         # Check if user has permission to post
         if current_user.role not in ['admin', 'manager']:
             flash('Access denied. Only managers and admins can post to SAP B1.', 'error')
-            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+            return redirect(url_for('grn_detail', grn_id=grn_id))
         
-        # Check if GRPO is approved
-        if grpo_doc.status != 'approved':
-            flash('GRPO must be approved before posting to SAP B1.', 'error')
-            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        # Check if GRN is approved
+        if grn_doc.status != 'approved':
+            flash('GRN must be approved before posting to SAP B1.', 'error')
+            return redirect(url_for('grn_detail', grn_id=grn_id))
         
         # Check if already posted
-        if grpo_doc.sap_document_number:
-            flash(f'GRPO already posted to SAP B1 as document {grpo_doc.sap_document_number}.', 'warning')
-            return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        if grn_doc.sap_document_number:
+            flash(f'GRN already posted to SAP B1 as document {grn_doc.sap_document_number}.', 'warning')
+            return redirect(url_for('grn_detail', grn_id=grn_id))
         
         # Post to SAP B1
         logging.info("=" * 100)
-        logging.info("🔄 MANUAL POSTING GRPO TO SAP B1")
+        logging.info("🔄 MANUAL POSTING GRN TO SAP B1")
         logging.info("=" * 100)
-        logging.info(f"📋 GRPO ID: {grpo_doc.id}")
-        logging.info(f"📄 PO Number: {grpo_doc.po_number}")
+        logging.info(f"📋 GRN ID: {grn_doc.id}")
+        logging.info(f"📄 PO Number: {grn_doc.po_number}")
         logging.info(f"👤 Manual Post User: {current_user.username}")
         
         sap = SAPIntegration()
-        result = sap.post_grpo_to_sap(grpo_doc)
+        result = sap.post_grn_to_sap(grn_doc)
         
         if result.get('success'):
             logging.info("=" * 100)
-            logging.info("✅ SUCCESS: MANUAL GRPO POSTED TO SAP B1")
+            logging.info("✅ SUCCESS: MANUAL GRN POSTED TO SAP B1")
             logging.info(f"📄 SAP Document Number: {result.get('sap_document_number')}")
             logging.info("=" * 100)
-            flash(f'GRPO successfully posted to SAP B1 as Purchase Delivery Note {result.get("sap_document_number")}.', 'success')
+            flash(f'GRN successfully posted to SAP B1 as Goods Received Note {result.get("sap_document_number")}.', 'success')
         else:
             logging.error("=" * 100)
-            logging.error("❌ FAILED: MANUAL GRPO POSTING TO SAP B1 FAILED")
+            logging.error("❌ FAILED: MANUAL GRN POSTING TO SAP B1 FAILED")
             logging.error(f"🚫 Error: {result.get('error')}")
             logging.error("=" * 100)
-            flash(f'Error posting GRPO to SAP B1: {result.get("error")}', 'error')
+            flash(f'Error posting GRN to SAP B1: {result.get("error")}', 'error')
         
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        return redirect(url_for('grn_detail', grn_id=grn_id))
         
     except Exception as e:
-        logging.error(f"Error in post_grpo_to_sap_manual: {str(e)}")
-        flash(f'Error posting GRPO to SAP B1: {str(e)}', 'error')
-        return redirect(url_for('grpo_detail', grpo_id=grpo_id))
+        logging.error(f"Error in post_grn_to_sap_manual: {str(e)}")
+        flash(f'Error posting GRN to SAP B1: {str(e)}', 'error')
+        return redirect(url_for('grn_detail', grn_id=grn_id))
 
 @app.route('/api/validate_transfer_request', methods=['POST'])
 @login_required
@@ -1876,22 +1876,22 @@ def sync_sap_data():
 
 # Default admin user is created in app.py during initialization
 
-@app.route('/api/grpo/<int:grpo_id>/preview_json')
+@app.route('/api/grn/<int:grn_id>/preview_json')
 @login_required
-def preview_grpo_json(grpo_id):
+def preview_grn_json(grn_id):
     """Preview the JSON that will be posted to SAP B1"""
     try:
-        grpo_doc = GRPODocument.query.get_or_404(grpo_id)
+        grn_doc = GRNDocument.query.get_or_404(grn_id)
         
         # Generate the same JSON that would be posted to SAP B1
         sap = SAPIntegration()
         
         # Get PO data
-        po_data = sap.get_purchase_order(grpo_doc.po_number)
+        po_data = sap.get_purchase_order(grn_doc.po_number)
         if not po_data:
             return jsonify({'success': False, 'error': 'PO data not found'})
         
-        # Build the Purchase Delivery Note JSON structure using PO dates
+        # Build the Goods Received Note JSON structure using PO dates
         card_code = po_data.get('CardCode')
         po_doc_entry = po_data.get('DocEntry')
         
@@ -1906,12 +1906,12 @@ def preview_grpo_json(grpo_id):
             doc_due_date = doc_due_date.split('T')[0]
         
         # Generate external reference
-        external_ref = sap.generate_external_reference_number(grpo_doc)
+        external_ref = sap.generate_external_reference_number(grn_doc)
         
         # Get BusinessPlaceID from PO DocumentLines instead of bin location
         first_warehouse_code = None
-        if grpo_doc.items:
-            for item in grpo_doc.items:
+        if grn_doc.items:
+            for item in grn_doc.items:
                 if item.qc_status == 'approved':
                     # Find matching PO line to get proper warehouse code
                     for po_line in po_data.get('DocumentLines', []):
@@ -1928,7 +1928,7 @@ def preview_grpo_json(grpo_id):
         document_lines = []
         line_number = 0
         
-        for item in grpo_doc.items:
+        for item in grn_doc.items:
             if item.qc_status != 'approved':
                 continue
                 
@@ -1993,15 +1993,15 @@ def preview_grpo_json(grpo_id):
             "CardCode": card_code,
             "DocDate": doc_date,
             "DocDueDate": doc_due_date,
-            "Comments": grpo_doc.notes or "Auto-created from PO after QC",
+            "Comments": grn_doc.notes or "Auto-created from PO after QC",
             "NumAtCard": external_ref,
             "BPL_IDAssignedToInvoice": business_place_id,
             "DocumentLines": document_lines
         }
         
         # Log the complete JSON structure for debugging
-        logging.info(f"🔍 JSON Preview Generated for GRPO {grpo_id}:")
-        logging.info(f"📊 PO Number: {grpo_doc.po_number}")
+        logging.info(f"🔍 JSON Preview Generated for GRN {grn_id}:")
+        logging.info(f"📊 PO Number: {grn_doc.po_number}")
         logging.info(f"📋 Total Lines: {len(document_lines)}")
         logging.info("=" * 80)
         logging.info("🏗️ COMPLETE JSON STRUCTURE TO BE POSTED TO SAP B1:")
@@ -2014,8 +2014,8 @@ def preview_grpo_json(grpo_id):
         return jsonify({
             'success': True,
             'json_data': pdn_data,
-            'grpo_id': grpo_id,
-            'po_number': grpo_doc.po_number,
+            'grn_id': grn_id,
+            'po_number': grn_doc.po_number,
             'total_lines': len(document_lines)
         })
         

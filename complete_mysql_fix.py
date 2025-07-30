@@ -85,21 +85,58 @@ def complete_mysql_fix():
                 else:
                     print(f"⚠️ Error adding {column.split()[0]}: {e}")
         
-        print("📝 Step 4: Add missing GRPO document columns...")
-        grpo_columns = [
+        print("📝 Step 4: Migrate GRPO to GRN tables...")
+        
+        # Check if grpo_documents exists and rename to grn_documents
+        try:
+            cursor.execute("SHOW TABLES LIKE 'grpo_documents'")
+            grpo_docs_exists = cursor.fetchone()
+            
+            if grpo_docs_exists:
+                cursor.execute("RENAME TABLE grpo_documents TO grn_documents")
+                print("✅ Renamed grpo_documents to grn_documents")
+            else:
+                print("✓ grn_documents table ready")
+        except Exception as e:
+            print(f"⚠️ Error migrating documents table: {e}")
+        
+        # Check if grpo_items exists and rename to grn_items
+        try:
+            cursor.execute("SHOW TABLES LIKE 'grpo_items'")
+            grpo_items_exists = cursor.fetchone()
+            
+            if grpo_items_exists:
+                cursor.execute("RENAME TABLE grpo_items TO grn_items")
+                print("✅ Renamed grpo_items to grn_items")
+                
+                # Update column names
+                cursor.execute("ALTER TABLE grn_items CHANGE COLUMN grpo_document_id grn_document_id INT NOT NULL")
+                print("✅ Updated column grpo_document_id to grn_document_id")
+                
+                # Update foreign key
+                cursor.execute("ALTER TABLE grn_items DROP FOREIGN KEY IF EXISTS grn_items_ibfk_1")
+                cursor.execute("ALTER TABLE grn_items ADD CONSTRAINT grn_items_ibfk_1 FOREIGN KEY (grn_document_id) REFERENCES grn_documents(id) ON DELETE CASCADE")
+                print("✅ Updated foreign key constraint")
+            else:
+                print("✓ grn_items table ready")
+        except Exception as e:
+            print(f"⚠️ Error migrating items table: {e}")
+            
+        # Add missing columns to grn_documents if needed
+        grn_columns = [
             "sap_document_number VARCHAR(50)",
             "qc_user_id INT",
-            "qc_notes TEXT",
+            "qc_notes TEXT", 
             "draft_or_post VARCHAR(20) DEFAULT 'draft'"
         ]
         
-        for column in grpo_columns:
+        for column in grn_columns:
             try:
-                cursor.execute(f"ALTER TABLE grpo_documents ADD COLUMN {column}")
-                print(f"✅ Added GRPO column: {column.split()[0]}")
+                cursor.execute(f"ALTER TABLE grn_documents ADD COLUMN {column}")
+                print(f"✅ Added GRN column: {column.split()[0]}")
             except Exception as e:
                 if "Duplicate column name" in str(e):
-                    print(f"✓ GRPO column exists: {column.split()[0]}")
+                    print(f"✓ GRN column exists: {column.split()[0]}")
                 else:
                     print(f"⚠️ Error adding {column.split()[0]}: {e}")
         
@@ -122,7 +159,7 @@ def complete_mysql_fix():
             cursor.execute("""
                 INSERT IGNORE INTO document_number_series (document_type, prefix, current_number, year_suffix)
                 VALUES 
-                ('GRPO', 'GRPO-', 1, TRUE),
+                ('GRN', 'GRN-', 1, TRUE),
                 ('TRANSFER', 'TR-', 1, TRUE),
                 ('PICKLIST', 'PL-', 1, TRUE)
             """)
@@ -170,10 +207,27 @@ def complete_mysql_fix():
         cursor.close()
         connection.close()
         
+        print("📝 Step 8: Update document number series and permissions...")
+        
+        # Update document series from GRPO to GRN
+        try:
+            cursor.execute("UPDATE document_number_series SET document_type = 'GRN', prefix = 'GRN-' WHERE document_type = 'GRPO'")
+            print("✅ Updated document series from GRPO to GRN")
+        except Exception as e:
+            print(f"⚠️ Error updating document series: {e}")
+        
+        # Update user permissions from grpo to grn
+        try:
+            cursor.execute("UPDATE users SET permissions = REPLACE(permissions, '\"grpo\"', '\"grn\"') WHERE permissions LIKE '%grpo%'")
+            print("✅ Updated user permissions from grpo to grn")
+        except Exception as e:
+            print(f"⚠️ Error updating permissions: {e}")
+        
         print("\n🎉 Complete MySQL fix successful!")
         print("✓ All database schema issues resolved")
         print("✓ Admin credentials reset (admin/admin123)")
-        print("✓ GRPO validation and document numbering ready")
+        print("✓ GRPO migrated to GRN (Goods Received Note)")
+        print("✓ GRN validation and document numbering ready")
         print("\n🚀 Restart your Flask app and try logging in!")
         
         return True

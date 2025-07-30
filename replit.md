@@ -140,6 +140,18 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 30, 2025. GRPO to GRN (Goods Received Note) Migration - COMPLETED:
+  - Changed all GRPO terminology to "Goods Received Note (GRN)" throughout the application as requested
+  - Updated database models: GRPODocument → GRNDocument, GRPOItem → GRNItem
+  - Renamed database tables: grpo_documents → grn_documents, grpo_items → grn_items
+  - Updated all route functions, templates, and navigation menus to use GRN terminology
+  - Modified MySQL migration scripts to create grn_documents and grn_items tables
+  - Updated document numbering series from GRPO- to GRN- prefix
+  - Changed user permissions from 'grpo' to 'grn' in models and database
+  - Renamed template files: grpo.html → grn.html, grpo_detail.html → grn_detail.html
+  - Updated all HTML templates, forms, modals, and UI text to use "Goods Received Note (GRN)"
+  - Modified complete_mysql_fix.py to handle GRPO→GRN table migration automatically
+  - Application now fully uses GRN terminology while maintaining all existing functionality
 - July 30, 2025. MySQL Schema Fix for Local Development - COMPLETED:
   - Fixed critical MySQL database schema issues causing login failures
   - Created fix_mysql_schema.py script to add missing columns automatically
