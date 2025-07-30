@@ -140,6 +140,14 @@ Complete React Native mobile application created with:
 ## Changelog
 
 Latest Changes:
+- July 30, 2025. Critical MySQL Bin Location Column Size Fix - COMPLETED:
+  - Fixed "Data too long for column 'bin_location'" error in MySQL local environments
+  - Created fix_mysql_bin_location.py script to increase bin_location column from VARCHAR(20) to VARCHAR(100)
+  - Updated mysql_complete_migration.py to use VARCHAR(100) for bin_location in grn_items and pick_list_items tables
+  - Fixed batch dropdown to filter by selected ItemCode instead of showing all warehouse batches
+  - Enhanced GRN Add Item form with proper batch filtering for accurate item-specific batch selection
+  - Database schema now supports longer bin location names like 'ORBS-MLD-SYSTEM-BIN-LOCATION'
+  - Both PostgreSQL (Replit) and MySQL (local) environments now have consistent column sizes
 - July 30, 2025. Successful Migration from Replit Agent to Replit Environment - COMPLETED:
   - Fixed critical SAP integration error by adding missing `post_grn_to_sap` method using monkey-patching approach
   - Resolved database schema issues: added missing columns to branches table and increased bin_location column size to VARCHAR(100)
