@@ -160,7 +160,7 @@ class GRNItem(db.Model):
                                nullable=False)  # Quantity being received
     unit_of_measure = db.Column(db.String(10), nullable=False)
     unit_price = db.Column(db.Float, nullable=True)
-    bin_location = db.Column(db.String(120), nullable=False)
+    bin_location = db.Column(db.String(200), nullable=False)
     batch_number = db.Column(db.String(50), nullable=True)
     serial_number = db.Column(db.String(50), nullable=True)  # Serial number for serial-managed items
     expiration_date = db.Column(db.DateTime, nullable=True)

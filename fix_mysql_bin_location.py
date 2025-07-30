@@ -18,8 +18,8 @@ def fix_mysql_bin_location():
     mysql_config = {
         'host': os.getenv('MYSQL_HOST', 'localhost'),
         'user': os.getenv('MYSQL_USER', 'root'),
-        'password': os.getenv('MYSQL_PASSWORD', ''),
-        'database': os.getenv('MYSQL_DATABASE', 'warehouse_management'),
+        'password': os.getenv('MYSQL_PASSWORD', 'root@123'),
+        'database': os.getenv('MYSQL_DATABASE', 'wms_db_test'),
         'charset': 'utf8mb4'
     }
     
