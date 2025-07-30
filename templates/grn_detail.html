@@ -468,6 +468,9 @@ function addItemToGRN(itemCode, itemName, uom, warehouseCode, poItemData) {
     document.getElementById('expiration_date').value = '';
     document.getElementById('barcode').value = '';
     
+    // Load batches for this specific item code
+    loadBatchesForItem(itemCode);
+    
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
 }
@@ -815,7 +818,7 @@ function handleWarehouseSelection() {
         binSelect.disabled = false;
         batchSelect.disabled = false;
         loadBins(warehouseSelect.value);
-        loadBatches(warehouseSelect.value);
+        // Note: Batches are loaded based on item code, not warehouse
     } else {
         binSelect.disabled = true;
         batchSelect.disabled = true;
@@ -849,28 +852,42 @@ function loadBins(warehouseCode) {
         });
 }
 
-// Load batches for selected warehouse
-function loadBatches(warehouseCode) {
-    fetch(`/api/warehouses/${warehouseCode}/batches`)
+// Load batches for selected item code
+function loadBatchesForItem(itemCode) {
+    if (!itemCode) {
+        const batchSelect = document.getElementById('batch_select');
+        batchSelect.innerHTML = '<option value="">Select Batch...</option>';
+        batchSelect.disabled = true;
+        return;
+    }
+    
+    fetch(`/api/items/${itemCode}/batches`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 batchesData = data.batches;
                 const batchSelect = document.getElementById('batch_select');
                 batchSelect.innerHTML = '<option value="">Select Batch...</option>';
+                batchSelect.disabled = false;
                 
                 batchesData.forEach(batch => {
                     const option = document.createElement('option');
                     option.value = batch.Batch;
-                    option.textContent = `${batch.Batch} - ${batch.ItemCode} (Exp: ${batch.ExpirationDate})`;
+                    option.textContent = `${batch.Batch} (Exp: ${batch.ExpirationDate || 'N/A'})`;
                     batchSelect.appendChild(option);
                 });
             } else {
                 console.error('Error loading batches:', data.error);
+                const batchSelect = document.getElementById('batch_select');
+                batchSelect.innerHTML = '<option value="">No batches available</option>';
+                batchSelect.disabled = true;
             }
         })
         .catch(error => {
             console.error('Error fetching batches:', error);
+            const batchSelect = document.getElementById('batch_select');
+            batchSelect.innerHTML = '<option value="">Error loading batches</option>';
+            batchSelect.disabled = true;
         });
 }
 
